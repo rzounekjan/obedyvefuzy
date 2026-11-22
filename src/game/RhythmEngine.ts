@@ -44,6 +44,8 @@ const _ndc = new THREE.Vector2();
 
 interface ActiveTileVisual {
   note: NoteEvent;
+  itemType: ItemType;
+  baseItemScale: number;
   group: THREE.Group;
   trayMesh: THREE.Mesh;
   rimMat: THREE.MeshStandardMaterial;
@@ -72,18 +74,55 @@ interface Particle {
   color: THREE.Color;
 }
 
-function detectSoftwareWebGL(): boolean {
+interface GpuTier {
+  isSoftwareGl: boolean;
+  isMobileLite: boolean;
+}
+
+const ALL_ITEM_TYPES: readonly ItemType[] = [
+  'knife',
+  'fork',
+  'spoon',
+  'cloth',
+  'plate',
+  'water',
+  'beer',
+  'shot',
+  'napkin',
+  'wine',
+];
+
+function detectGpuTier(): GpuTier {
+  let gpu = '';
+  let isSoftwareGl = false;
   try {
     const gl = document.createElement('canvas').getContext('webgl2');
-    if (!gl) return true;
-    const ext = gl.getExtension('WEBGL_debug_renderer_info');
-    const param = ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER;
-    const gpu = String(gl.getParameter(param));
-    gl.getExtension('WEBGL_lose_context')?.loseContext();
-    return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
+    if (!gl) {
+      isSoftwareGl = true;
+    } else {
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      const param = ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER;
+      gpu = String(gl.getParameter(param) || '');
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      isSoftwareGl = /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
+    }
   } catch {
-    return true;
+    isSoftwareGl = true;
   }
+
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const isTouchDevice =
+    typeof window !== 'undefined' &&
+    (window.matchMedia?.('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod|Mobile/i.test(ua));
+  const isEntryMobileGpu =
+    /Mali-G57|Mali-G52|Mali-G31|Mali-G72|Mali-T|Adreno\s*\(TM\)\s*(3\d\d|4\d\d|5\d\d|61\d|62\d)|PowerVR|IMG/i.test(
+      gpu,
+    );
+
+  return {
+    isSoftwareGl,
+    isMobileLite: !isSoftwareGl && (isTouchDevice || isEntryMobileGpu),
+  };
 }
 
 export class RhythmEngine {
@@ -92,6 +131,14 @@ export class RhythmEngine {
   private onLevelComplete?: (levelId: number, snapshot: HudSnapshot) => void;
 
   private isSoftwareGl: boolean;
+  private isMobileLite: boolean;
+  private lowPower: boolean;
+  private maxPixelRatio: number;
+  private currentPixelRatio: number;
+  private perfFrameCount = 0;
+  private perfFrameTimeAcc = 0;
+  private perfHeadroomStreak = 0;
+
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -112,6 +159,7 @@ export class RhythmEngine {
   private currentLevel: LevelDefinition = getLevelById(1);
   private notes: NoteEvent[] = [];
   private activeVisuals: Map<number, ActiveTileVisual> = new Map();
+  private tilePool: Map<ItemType, ActiveTileVisual[]> = new Map();
   private score = 0;
   private combo = 0;
   private maxCombo = 0;
@@ -155,8 +203,9 @@ export class RhythmEngine {
   private strikeBarGlowMat!: THREE.MeshStandardMaterial;
   private eqBarsLeft: THREE.Mesh[] = [];
   private eqBarsRight: THREE.Mesh[] = [];
+  private eqBarMat!: THREE.MeshStandardMaterial;
   private chandelierLights: THREE.PointLight[] = [];
-  private chandelierBulbs: THREE.MeshStandardMaterial[] = [];
+  private chandelierBulbMat!: THREE.MeshStandardMaterial;
   private accentSpotLight!: THREE.PointLight;
 
   // Title showcase hero turntable
@@ -168,7 +217,7 @@ export class RhythmEngine {
   private shockwaves: ShockwaveRing[] = [];
   private particles: Particle[] = [];
   private particleMesh!: THREE.InstancedMesh;
-  private readonly MAX_PARTICLES = 240;
+  private maxParticles = 240;
 
   // Raycasting for direct 3D lane tap
   private raycaster = new THREE.Raycaster();
@@ -197,19 +246,32 @@ export class RhythmEngine {
     this.onHudUpdate = onHudUpdate;
     this.onLevelComplete = onLevelComplete;
 
-    this.isSoftwareGl = detectSoftwareWebGL();
+    const tier = detectGpuTier();
+    this.isSoftwareGl = tier.isSoftwareGl;
+    this.isMobileLite = tier.isMobileLite;
+    this.lowPower = this.isSoftwareGl || this.isMobileLite;
+    this.maxParticles = this.lowPower ? 84 : 240;
 
-    // 1. Renderer setup (Three.js r160+ PBR & Software-GL Guard)
+    // On FHD+ entry mobile GPUs (e.g. Moto G14 Mali-G57 MP1), cap initial DPR at 1.25
+    // and skip 4x MSAA + stencil buffer to cut fragment fillrate by ~4x while staying crisp.
+    const dpr = window.devicePixelRatio || 1;
+    this.maxPixelRatio = this.isSoftwareGl ? 1 : this.isMobileLite ? Math.min(dpr, 1.25) : Math.min(dpr, 2);
+    this.currentPixelRatio = this.maxPixelRatio;
+
+    // 1. Renderer setup (Three.js r160+ PBR & Mobile GPU Guard)
     this.renderer = new THREE.WebGLRenderer({
-      antialias: !this.isSoftwareGl,
+      antialias: !this.lowPower,
+      stencil: false,
       powerPreference: 'high-performance',
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.12;
-    this.renderer.setPixelRatio(this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = !this.isSoftwareGl;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.setPixelRatio(this.currentPixelRatio);
+    this.renderer.shadowMap.enabled = !this.lowPower;
+    if (!this.lowPower) {
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
     this.renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
     this.renderer.domElement.style.display = 'block';
     this.renderer.domElement.style.width = '100%';
@@ -238,8 +300,8 @@ export class RhythmEngine {
 
     // 5. Textures, Models & Audio
     const maxAniso = this.renderer.capabilities.getMaxAnisotropy();
-    this.textures = createProceduralTextures(maxAniso);
-    this.modelLib = createTablewareModelLibrary(this.textures, this.isSoftwareGl);
+    this.textures = createProceduralTextures(maxAniso, this.lowPower);
+    this.modelLib = createTablewareModelLibrary(this.textures, this.lowPower);
     this.audio = new RhythmAudioEngine();
 
     // Shared tile coaster geometries/materials
@@ -262,7 +324,7 @@ export class RhythmEngine {
       map: this.textures.contactShadow,
       transparent: true,
       depthWrite: false,
-      opacity: 0.52,
+      opacity: 0.54,
     });
 
     // 6. Build Lighting, Bistro Environment, Track, Equalizers, Effects & Title Showcase
@@ -276,10 +338,12 @@ export class RhythmEngine {
     this.scene.add(this.showcaseGroup);
     this.setShowcaseLevel(1);
 
-    // Pre-compile shaders on hardware GPU
+    // Pre-warm tile pool & compile shaders on startup to eliminate mid-song frame hitches
+    this.prewarmTilePool();
     if (!this.isSoftwareGl) {
       this.renderer.compile(this.scene, this.camera);
     }
+    this.hidePrewarmedPool();
 
     // Listeners
     this.boundResize = this.handleResize.bind(this);
@@ -305,13 +369,13 @@ export class RhythmEngine {
 
   private buildLighting(): void {
     // Cool indigo/slate hemisphere fill vs warm amber key light
-    const hemi = new THREE.HemisphereLight(0x8fa8d4, 0x2b190d, 0.72);
+    const hemi = new THREE.HemisphereLight(0x8fa8d4, 0x2b190d, this.lowPower ? 0.9 : 0.72);
     this.scene.add(hemi);
 
-    // Warm bistro directional key light (single shadow caster)
-    const key = new THREE.DirectionalLight(0xffe0b2, 1.85);
+    // Warm bistro directional key light (single shadow caster on desktop)
+    const key = new THREE.DirectionalLight(0xffe0b2, this.lowPower ? 2.05 : 1.85);
     key.position.set(7, 14, 9);
-    if (!this.isSoftwareGl) {
+    if (!this.lowPower) {
       key.castShadow = true;
       key.shadow.mapSize.set(1024, 1024);
       key.shadow.camera.near = 1;
@@ -326,10 +390,12 @@ export class RhythmEngine {
     }
     this.scene.add(key);
 
-    // Cool rim backlight separating cutlery & glass from dark hall
-    const rim = new THREE.DirectionalLight(0x7fb4e8, 0.9);
-    rim.position.set(-8, 8, -14);
-    this.scene.add(rim);
+    // Cool rim backlight on desktop (on mobile, RoomEnvironment IBL handles rim reflection cheaply)
+    if (!this.lowPower) {
+      const rim = new THREE.DirectionalLight(0x7fb4e8, 0.9);
+      rim.position.set(-8, 8, -14);
+      this.scene.add(rim);
+    }
 
     // Beat-reactive strike zone accent light
     this.accentSpotLight = new THREE.PointLight(0xe2b86b, 2.2, 22, 1.6);
@@ -362,16 +428,22 @@ export class RhythmEngine {
       }),
     );
     trackDeck.position.set(0, -0.22, -16);
-    trackDeck.receiveShadow = true;
+    trackDeck.receiveShadow = !this.lowPower;
     this.scene.add(trackDeck);
 
     // Brushed Brass outer rails
-    const railMat = new THREE.MeshPhysicalMaterial({
-      color: 0xd4a24c,
-      metalness: 0.9,
-      roughness: 0.24,
-      anisotropy: 0.6,
-    });
+    const railMat = this.lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0xd4a24c,
+          metalness: 0.88,
+          roughness: 0.25,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0xd4a24c,
+          metalness: 0.9,
+          roughness: 0.24,
+          anisotropy: 0.6,
+        });
     const railGeo = new THREE.BoxGeometry(0.18, 0.14, TRACK_LENGTH);
     for (const side of [-1, 1]) {
       const rail = new THREE.Mesh(railGeo, railMat);
@@ -458,7 +530,7 @@ export class RhythmEngine {
     }
     this.raycaster.layers.set(1);
 
-    // Flanking Beat-Synchronized 3D Spectrum Equalizer Columns (12 per side)
+    // Flanking Beat-Synchronized 3D Spectrum Equalizer Columns (shared single material for zero state churn)
     const eqGeo = new THREE.BoxGeometry(0.32, 1.0, 0.55);
     eqGeo.translate(0, 0.5, 0); // pivot at bottom
     const pillarBaseGeo = new THREE.BoxGeometry(0.54, 0.26, 0.78);
@@ -467,9 +539,18 @@ export class RhythmEngine {
       roughness: 0.55,
       metalness: 0.35,
     });
+    this.eqBarMat = new THREE.MeshStandardMaterial({
+      color: 0xe6b55c,
+      emissive: 0xc88424,
+      emissiveIntensity: 0.75,
+      metalness: 0.65,
+      roughness: 0.22,
+    });
 
-    for (let i = 0; i < 12; i++) {
-      const z = STRIKE_Z - 2.2 - i * 3.1;
+    const eqCount = this.lowPower ? 9 : 12;
+    const eqStep = this.lowPower ? 4.1 : 3.1;
+    for (let i = 0; i < eqCount; i++) {
+      const z = STRIKE_Z - 2.2 - i * eqStep;
       for (const side of [-1, 1]) {
         const x = side * (TRACK_WIDTH / 2 + 1.25);
 
@@ -477,14 +558,7 @@ export class RhythmEngine {
         plinth.position.set(x, -0.32, z);
         this.scene.add(plinth);
 
-        const barMat = new THREE.MeshStandardMaterial({
-          color: 0xe6b55c,
-          emissive: 0xc88424,
-          emissiveIntensity: 0.75,
-          metalness: 0.65,
-          roughness: 0.22,
-        });
-        const bar = new THREE.Mesh(eqGeo, barMat);
+        const bar = new THREE.Mesh(eqGeo, this.eqBarMat);
         bar.position.set(x, -0.19, z);
         bar.scale.y = 0.6 + (i % 3) * 0.25;
         this.scene.add(bar);
@@ -496,25 +570,32 @@ export class RhythmEngine {
 
     // Overhead Bistro Pendant Chandeliers stretching down the hall
     const cordGeo = new THREE.CylinderGeometry(0.018, 0.018, 3.8, 6);
-    const shadeGeo = new THREE.ConeGeometry(0.46, 0.32, 16, 1, true);
-    const bulbGeo = new THREE.SphereGeometry(0.14, 12, 10);
-    const shadeMat = new THREE.MeshPhysicalMaterial({
-      color: 0x2c2018,
-      metalness: 0.75,
-      roughness: 0.3,
-      side: THREE.DoubleSide,
-    });
+    const shadeGeo = new THREE.ConeGeometry(0.46, 0.32, this.lowPower ? 10 : 16, 1, true);
+    const bulbGeo = new THREE.SphereGeometry(0.14, this.lowPower ? 8 : 12, this.lowPower ? 6 : 10);
+    const shadeMat = this.lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0x2c2018,
+          metalness: 0.72,
+          roughness: 0.32,
+          side: THREE.DoubleSide,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0x2c2018,
+          metalness: 0.75,
+          roughness: 0.3,
+          side: THREE.DoubleSide,
+        });
     const cordMat = new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.7 });
+    this.chandelierBulbMat = new THREE.MeshStandardMaterial({
+      color: 0xfff0cc,
+      emissive: 0xffb84d,
+      emissiveIntensity: 1.5,
+      roughness: 0.2,
+    });
 
-    for (let i = 0; i < 5; i++) {
+    const chandelierCount = this.lowPower ? 4 : 5;
+    for (let i = 0; i < chandelierCount; i++) {
       const z = -2 - i * 8.5;
-      const bulbMat = new THREE.MeshStandardMaterial({
-        color: 0xfff0cc,
-        emissive: 0xffb84d,
-        emissiveIntensity: 1.5,
-        roughness: 0.2,
-      });
-      this.chandelierBulbs.push(bulbMat);
 
       for (const side of [-1, 1]) {
         const grp = new THREE.Group();
@@ -522,13 +603,14 @@ export class RhythmEngine {
         const cord = new THREE.Mesh(cordGeo, cordMat);
         cord.position.y = 1.9;
         const shade = new THREE.Mesh(shadeGeo, shadeMat);
-        const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+        const bulb = new THREE.Mesh(bulbGeo, this.chandelierBulbMat);
         bulb.position.y = -0.1;
         grp.add(cord, shade, bulb);
         this.scene.add(grp);
       }
 
-      if (i < 2) {
+      // Skip extra PointLights on mobile tier to keep fragment shader light count minimal (3 lights total)
+      if (!this.lowPower && i < 2) {
         const pt = new THREE.PointLight(0xffc978, 1.2, 18, 1.8);
         pt.position.set(0, 4.6, z);
         this.scene.add(pt);
@@ -539,8 +621,9 @@ export class RhythmEngine {
 
   private buildShowcasePedestal(): void {
     // Elegant walnut & brass turntable visible on Title Screen
+    const segs = this.lowPower ? 20 : 36;
     const base = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.45, 1.65, 0.28, 36),
+      new THREE.CylinderGeometry(1.45, 1.65, 0.28, segs),
       new THREE.MeshStandardMaterial({
         color: 0x261912,
         roughness: 0.4,
@@ -548,23 +631,29 @@ export class RhythmEngine {
       }),
     );
     base.position.y = -0.14;
-    base.receiveShadow = true;
+    base.receiveShadow = !this.lowPower;
     this.showcaseGroup.add(base);
 
     const brassTrim = new THREE.Mesh(
-      new THREE.TorusGeometry(1.46, 0.045, 12, 48),
-      new THREE.MeshPhysicalMaterial({
-        color: 0xe2b86b,
-        metalness: 0.92,
-        roughness: 0.18,
-      }),
+      new THREE.TorusGeometry(1.46, 0.045, this.lowPower ? 8 : 12, this.lowPower ? 24 : 48),
+      this.lowPower
+        ? new THREE.MeshStandardMaterial({
+            color: 0xe2b86b,
+            metalness: 0.9,
+            roughness: 0.2,
+          })
+        : new THREE.MeshPhysicalMaterial({
+            color: 0xe2b86b,
+            metalness: 0.92,
+            roughness: 0.18,
+          }),
     );
     brassTrim.rotation.x = Math.PI / 2;
     brassTrim.position.y = 0.0;
     this.showcaseGroup.add(brassTrim);
 
     const velvetTop = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.38, 1.38, 0.04, 36),
+      new THREE.CylinderGeometry(1.38, 1.38, 0.04, segs),
       new THREE.MeshStandardMaterial({
         color: 0x3b181f,
         roughness: 0.85,
@@ -572,14 +661,15 @@ export class RhythmEngine {
       }),
     );
     velvetTop.position.y = 0.02;
-    velvetTop.receiveShadow = true;
+    velvetTop.receiveShadow = !this.lowPower;
     this.showcaseGroup.add(velvetTop);
   }
 
   private buildPooledEffects(): void {
     // 1. Pooled expanding shockwave rings at strike bar
-    const ringGeo = new THREE.RingGeometry(0.45, 0.62, 28);
-    for (let i = 0; i < 12; i++) {
+    const ringGeo = new THREE.RingGeometry(0.45, 0.62, this.lowPower ? 18 : 28);
+    const ringCount = this.lowPower ? 8 : 12;
+    for (let i = 0; i < ringCount; i++) {
       const mat = new THREE.MeshBasicMaterial({
         color: 0xf4c873,
         transparent: true,
@@ -598,10 +688,10 @@ export class RhythmEngine {
     // 2. Pooled 3D Sparkle Particles via InstancedMesh
     const pGeo = new THREE.OctahedronGeometry(0.085, 0);
     const pMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    this.particleMesh = new THREE.InstancedMesh(pGeo, pMat, this.MAX_PARTICLES);
+    this.particleMesh = new THREE.InstancedMesh(pGeo, pMat, this.maxParticles);
     this.particleMesh.frustumCulled = false;
 
-    for (let i = 0; i < this.MAX_PARTICLES; i++) {
+    for (let i = 0; i < this.maxParticles; i++) {
       this.particles.push({
         active: false,
         pos: new THREE.Vector3(0, -100, 0),
@@ -777,13 +867,18 @@ export class RhythmEngine {
       const itemDef = ITEMS[bestNote.item];
       const burstColor = bestNote.isUnique ? 0xffd269 : itemDef.accentInt;
       this.spawnShockwave(LANE_X[lane], burstColor, bestNote.isUnique ? 1.35 : 1.0);
-      this.spawnParticleBurst(
-        LANE_X[lane],
-        0.55,
-        STRIKE_Z,
-        burstColor,
-        bestNote.isUnique ? 28 : judgement === 'perfect' ? 18 : 11,
-      );
+      const particleCount = this.lowPower
+        ? bestNote.isUnique
+          ? 14
+          : judgement === 'perfect'
+            ? 9
+            : 6
+        : bestNote.isUnique
+          ? 28
+          : judgement === 'perfect'
+            ? 18
+            : 11;
+      this.spawnParticleBurst(LANE_X[lane], 0.55, STRIKE_Z, burstColor, particleCount);
 
       // Brief tactile hitstop on unique note perfect hits
       if (bestNote.isUnique && judgement === 'perfect') {
@@ -874,21 +969,20 @@ export class RhythmEngine {
     }
   }
 
-  private createTileVisual(note: NoteEvent): ActiveTileVisual {
+  private buildFreshTileVisual(itemType: ItemType): ActiveTileVisual {
     const group = new THREE.Group();
 
-    const trayMat = note.isUnique ? this.matTileBodyUnique : this.matTileBody;
-    const trayMesh = new THREE.Mesh(this.geoTileBase, trayMat);
+    const trayMesh = new THREE.Mesh(this.geoTileBase, this.matTileBody);
     trayMesh.position.y = 0.07;
-    trayMesh.receiveShadow = true;
-    trayMesh.castShadow = true;
+    trayMesh.receiveShadow = !this.lowPower;
+    trayMesh.castShadow = !this.lowPower;
     group.add(trayMesh);
 
-    const itemDef = ITEMS[note.item];
+    const itemDef = ITEMS[itemType];
     const rimMat = new THREE.MeshStandardMaterial({
-      color: note.isUnique ? 0xffd269 : itemDef.accentInt,
-      emissive: note.isUnique ? 0xd48d1e : itemDef.emissiveInt,
-      emissiveIntensity: note.isUnique ? 1.15 : 0.65,
+      color: itemDef.accentInt,
+      emissive: itemDef.emissiveInt,
+      emissiveIntensity: 0.65,
       metalness: 0.72,
       roughness: 0.22,
     });
@@ -903,16 +997,18 @@ export class RhythmEngine {
     group.add(shadowPlane);
 
     // 3D procedural tableware item seated cleanly on top of the coaster
-    const itemGroup = this.modelLib.createItemMesh(note.item);
+    const itemGroup = this.modelLib.createItemMesh(itemType);
+    const baseItemScale = itemGroup.scale.x;
     itemGroup.position.y = 0.168;
-    itemGroup.scale.multiplyScalar(note.isUnique ? 1.08 : 0.95);
     group.add(itemGroup);
 
-    group.position.set(LANE_X[note.lane], 0, SPAWN_Z);
+    group.position.set(0, 0, SPAWN_Z);
     this.scene.add(group);
 
     return {
-      note,
+      note: null as unknown as NoteEvent,
+      itemType,
+      baseItemScale,
       group,
       trayMesh,
       rimMat,
@@ -922,16 +1018,61 @@ export class RhythmEngine {
     };
   }
 
+  private prewarmTilePool(): void {
+    for (const itemType of ALL_ITEM_TYPES) {
+      const vis = this.buildFreshTileVisual(itemType);
+      vis.group.visible = true;
+      const bucket = this.tilePool.get(itemType);
+      if (bucket) bucket.push(vis);
+      else this.tilePool.set(itemType, [vis]);
+    }
+  }
+
+  private hidePrewarmedPool(): void {
+    this.tilePool.forEach((bucket) => {
+      for (const vis of bucket) {
+        vis.group.visible = false;
+      }
+    });
+  }
+
+  private createTileVisual(note: NoteEvent): ActiveTileVisual {
+    const bucket = this.tilePool.get(note.item);
+    const vis = bucket && bucket.length > 0 ? bucket.pop()! : this.buildFreshTileVisual(note.item);
+
+    const itemDef = ITEMS[note.item];
+    vis.note = note;
+    vis.hitAnim = 0;
+    vis.missedAnim = 0;
+    vis.trayMesh.material = note.isUnique ? this.matTileBodyUnique : this.matTileBody;
+    vis.rimMat.color.setHex(note.isUnique ? 0xffd269 : itemDef.accentInt);
+    vis.rimMat.emissive.setHex(note.isUnique ? 0xd48d1e : itemDef.emissiveInt);
+    vis.rimMat.emissiveIntensity = note.isUnique ? 1.15 : 0.65;
+
+    vis.group.scale.set(1, 1, 1);
+    vis.group.position.set(LANE_X[note.lane], 0, SPAWN_Z);
+    vis.itemGroup.position.y = 0.168;
+    vis.itemGroup.rotation.set(0, 0, 0);
+    vis.itemGroup.scale.setScalar(vis.baseItemScale * (note.isUnique ? 1.08 : 0.95));
+    vis.group.visible = true;
+
+    return vis;
+  }
+
   private removeTileVisual(id: number, visual: ActiveTileVisual): void {
-    this.scene.remove(visual.group);
-    visual.rimMat.dispose();
+    visual.group.visible = false;
     this.activeVisuals.delete(id);
+    const bucket = this.tilePool.get(visual.itemType);
+    if (bucket) bucket.push(visual);
+    else this.tilePool.set(visual.itemType, [visual]);
   }
 
   private clearActiveTiles(): void {
     this.activeVisuals.forEach((v) => {
-      this.scene.remove(v.group);
-      v.rimMat.dispose();
+      v.group.visible = false;
+      const bucket = this.tilePool.get(v.itemType);
+      if (bucket) bucket.push(v);
+      else this.tilePool.set(v.itemType, [v]);
     });
     this.activeVisuals.clear();
   }
@@ -1078,7 +1219,8 @@ export class RhythmEngine {
         return;
       }
 
-      if (nowMs - this.lastHudEmitMs >= 33) {
+      const hudIntervalMs = this.isMobileLite ? 50 : 33;
+      if (nowMs - this.lastHudEmitMs >= hudIntervalMs) {
         this.emitHud(false);
         this.lastHudEmitMs = nowMs;
       }
@@ -1182,10 +1324,8 @@ export class RhythmEngine {
     this.strikeBarGlowMat.emissiveIntensity = 0.75 + pulse * 1.35 + comboBoost * 0.5;
     this.accentSpotLight.intensity = 1.9 + pulse * 2.1 + comboBoost * 0.8;
 
-    // Pulse chandelier bulbs
-    for (let i = 0; i < this.chandelierBulbs.length; i++) {
-      this.chandelierBulbs[i].emissiveIntensity = 1.2 + pulse * 1.1;
-    }
+    // Pulse chandelier bulbs (shared single material)
+    this.chandelierBulbMat.emissiveIntensity = 1.2 + pulse * 1.1;
     for (let i = 0; i < this.chandelierLights.length; i++) {
       this.chandelierLights[i].intensity = 1.05 + pulse * 0.75;
     }
@@ -1215,7 +1355,8 @@ export class RhythmEngine {
       }
     }
 
-    // Equalizer side columns react to beat & wave down the hall
+    // Equalizer side columns react to beat & wave down the hall (shared single material)
+    this.eqBarMat.emissiveIntensity = 0.45 + pulse * 1.1;
     for (let i = 0; i < this.eqBarsLeft.length; i++) {
       const wave = 0.5 + 0.5 * Math.sin(beatVal * Math.PI * 1.0 - i * 0.55);
       const targetScaleY = 0.35 + (wave * 0.9 + pulse * 1.45) * (1 + comboBoost * 0.45);
@@ -1223,11 +1364,6 @@ export class RhythmEngine {
       const rBar = this.eqBarsRight[i];
       lBar.scale.y = THREE.MathUtils.damp(lBar.scale.y, targetScaleY, 14, dt);
       rBar.scale.y = THREE.MathUtils.damp(rBar.scale.y, targetScaleY, 14, dt);
-
-      const lMat = lBar.material as THREE.MeshStandardMaterial;
-      const rMat = rBar.material as THREE.MeshStandardMaterial;
-      lMat.emissiveIntensity = 0.45 + pulse * 1.1;
-      rMat.emissiveIntensity = 0.45 + pulse * 1.1;
     }
   }
 
@@ -1420,6 +1556,38 @@ export class RhythmEngine {
     }
   }
 
+  private updateAdaptiveResolution(rawDt: number): void {
+    if (!this.isMobileLite || this.isSoftwareGl || this.phase !== 'playing') return;
+    if (rawDt <= 0 || rawDt > 0.15) return; // Ignore background tab switches
+
+    this.perfFrameCount += 1;
+    this.perfFrameTimeAcc += rawDt;
+
+    if (this.perfFrameCount < 45) return;
+
+    const avgMs = (this.perfFrameTimeAcc / this.perfFrameCount) * 1000;
+    this.perfFrameCount = 0;
+    this.perfFrameTimeAcc = 0;
+
+    if (avgMs > 21.5 && this.currentPixelRatio > 0.85) {
+      this.perfHeadroomStreak = 0;
+      this.currentPixelRatio = Math.max(0.85, Number((this.currentPixelRatio - 0.15).toFixed(2)));
+      this.renderer.setPixelRatio(this.currentPixelRatio);
+    } else if (avgMs < 17.5 && this.currentPixelRatio < this.maxPixelRatio) {
+      this.perfHeadroomStreak += 1;
+      if (this.perfHeadroomStreak >= 3) {
+        this.perfHeadroomStreak = 0;
+        this.currentPixelRatio = Math.min(
+          this.maxPixelRatio,
+          Number((this.currentPixelRatio + 0.1).toFixed(2)),
+        );
+        this.renderer.setPixelRatio(this.currentPixelRatio);
+      }
+    } else {
+      this.perfHeadroomStreak = 0;
+    }
+  }
+
   private tick = (): void => {
     if (this.disposed) return;
     const now = performance.now();
@@ -1427,6 +1595,7 @@ export class RhythmEngine {
     this.lastTimeMs = now;
     const dt = Math.min(Math.max(rawDt, 0.001), 0.05);
 
+    this.updateAdaptiveResolution(rawDt);
     this.updateSimulation(dt, now);
     this.renderer.render(this.scene, this.camera);
     this.scheduleNextTick();
@@ -1442,6 +1611,14 @@ export class RhythmEngine {
     this.renderer.domElement.removeEventListener('webglcontextrestored', this.boundContextRestored);
 
     this.clearActiveTiles();
+    this.tilePool.forEach((bucket) => {
+      for (const vis of bucket) {
+        this.scene.remove(vis.group);
+        vis.rimMat.dispose();
+      }
+    });
+    this.tilePool.clear();
+
     this.audio.dispose();
     this.modelLib.dispose();
     this.textures.dispose();
@@ -1453,6 +1630,8 @@ export class RhythmEngine {
     this.matTileBody.dispose();
     this.matTileBodyUnique.dispose();
     this.matContactShadow.dispose();
+    this.eqBarMat.dispose();
+    this.chandelierBulbMat.dispose();
 
     this.renderer.dispose();
     if (this.renderer.domElement.parentNode === this.container) {

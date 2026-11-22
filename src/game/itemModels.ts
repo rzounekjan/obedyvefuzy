@@ -14,7 +14,7 @@ export interface TablewareModelLibrary {
  */
 export function createTablewareModelLibrary(
   textures: ProceduralTexturePack,
-  isSoftwareGl: boolean,
+  lowPower: boolean,
 ): TablewareModelLibrary {
   const disposableGeos: THREE.BufferGeometry[] = [];
   const disposableMats: THREE.Material[] = [];
@@ -28,33 +28,56 @@ export function createTablewareModelLibrary(
     return m;
   };
 
-  // --- Shared PBR Material Palette (varied roughness & metalness across adjacent parts) ---
+  // --- Shared PBR Material Palette ---
+  // On mobile/entry GPUs (e.g. Mali-G57 MP1), MeshStandardMaterial with calibrated IBL
+  // avoids expensive multi-lobe physical shaders & full-scene transmission render passes.
   const matBrushedSteel = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xe4e8ee,
-      metalness: 0.94,
-      roughness: 0.16,
-      anisotropy: 0.75,
-      clearcoat: 0.25,
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0xe4e8ee,
+          metalness: 0.92,
+          roughness: 0.18,
+          envMapIntensity: 1.25,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0xe4e8ee,
+          metalness: 0.94,
+          roughness: 0.16,
+          anisotropy: 0.75,
+          clearcoat: 0.25,
+        }),
   );
 
   const matPolishedSilver = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xf1f4f8,
-      metalness: 0.96,
-      roughness: 0.1,
-      clearcoat: 0.4,
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0xf1f4f8,
+          metalness: 0.95,
+          roughness: 0.12,
+          envMapIntensity: 1.35,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0xf1f4f8,
+          metalness: 0.96,
+          roughness: 0.1,
+          clearcoat: 0.4,
+        }),
   );
 
   const matBrushedBrass = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xd9a84e,
-      metalness: 0.92,
-      roughness: 0.2,
-      anisotropy: 0.65,
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0xd9a84e,
+          metalness: 0.9,
+          roughness: 0.22,
+          envMapIntensity: 1.2,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0xd9a84e,
+          metalness: 0.92,
+          roughness: 0.2,
+          anisotropy: 0.65,
+        }),
   );
 
   const matWalnutHandle = trackMat(
@@ -66,13 +89,20 @@ export function createTablewareModelLibrary(
   );
 
   const matPorcelain = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xf8f3eb,
-      metalness: 0.0,
-      roughness: 0.14,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.08,
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0xf8f3eb,
+          metalness: 0.04,
+          roughness: 0.14,
+          envMapIntensity: 1.2,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0xf8f3eb,
+          metalness: 0.0,
+          roughness: 0.14,
+          clearcoat: 0.9,
+          clearcoatRoughness: 0.08,
+        }),
   );
 
   const matPorcelainMatteFoot = trackMat(
@@ -84,50 +114,78 @@ export function createTablewareModelLibrary(
   );
 
   const matClearGlass = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xf0faff,
-      metalness: 0.0,
-      roughness: 0.06,
-      transmission: isSoftwareGl ? 0 : 0.88,
-      transparent: true,
-      opacity: isSoftwareGl ? 0.36 : 0.96,
-      ior: 1.52,
-      thickness: 0.4,
-      clearcoat: 1.0,
-      depthWrite: false,
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0xe8f9ff,
+          metalness: 0.16,
+          roughness: 0.07,
+          transparent: true,
+          opacity: 0.36,
+          envMapIntensity: 1.55,
+          depthWrite: false,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0xf0faff,
+          metalness: 0.0,
+          roughness: 0.06,
+          transmission: 0.88,
+          transparent: true,
+          opacity: 0.96,
+          ior: 1.52,
+          thickness: 0.4,
+          clearcoat: 1.0,
+          depthWrite: false,
+        }),
   );
 
   const matHeavyCrystal = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
-      metalness: 0.05,
-      roughness: 0.08,
-      transmission: isSoftwareGl ? 0 : 0.86,
-      transparent: true,
-      opacity: isSoftwareGl ? 0.42 : 0.98,
-      ior: 1.62,
-      thickness: 0.65,
-      clearcoat: 1.0,
-      depthWrite: false,
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0xf4faff,
+          metalness: 0.18,
+          roughness: 0.09,
+          transparent: true,
+          opacity: 0.42,
+          envMapIntensity: 1.6,
+          depthWrite: false,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0xffffff,
+          metalness: 0.05,
+          roughness: 0.08,
+          transmission: 0.86,
+          transparent: true,
+          opacity: 0.98,
+          ior: 1.62,
+          thickness: 0.65,
+          clearcoat: 1.0,
+          depthWrite: false,
+        }),
   );
 
   const matWaterLiquid = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0x76d6ec,
-      metalness: 0.0,
-      roughness: 0.08,
-      transparent: true,
-      opacity: 0.72,
-      clearcoat: 0.8,
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0x76d6ec,
+          metalness: 0.05,
+          roughness: 0.1,
+          transparent: true,
+          opacity: 0.74,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0x76d6ec,
+          metalness: 0.0,
+          roughness: 0.08,
+          transparent: true,
+          opacity: 0.72,
+          clearcoat: 0.8,
+        }),
   );
 
   const matIce = trackMat(
-    new THREE.MeshPhysicalMaterial({
+    new THREE.MeshStandardMaterial({
       color: 0xdff7ff,
-      metalness: 0.0,
+      metalness: 0.05,
       roughness: 0.18,
       transparent: true,
       opacity: 0.78,
@@ -151,16 +209,26 @@ export function createTablewareModelLibrary(
   );
 
   const matBeerLiquid = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xe69517,
-      emissive: 0x542c00,
-      emissiveIntensity: 0.25,
-      metalness: 0.0,
-      roughness: 0.12,
-      transparent: true,
-      opacity: 0.92,
-      clearcoat: 0.6,
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0xe69517,
+          emissive: 0x542c00,
+          emissiveIntensity: 0.25,
+          metalness: 0.04,
+          roughness: 0.14,
+          transparent: true,
+          opacity: 0.92,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0xe69517,
+          emissive: 0x542c00,
+          emissiveIntensity: 0.25,
+          metalness: 0.0,
+          roughness: 0.12,
+          transparent: true,
+          opacity: 0.92,
+          clearcoat: 0.6,
+        }),
   );
 
   const matBeerFoam = trackMat(
@@ -172,25 +240,31 @@ export function createTablewareModelLibrary(
   );
 
   const matSpiritLiquid = trackMat(
-    new THREE.MeshPhysicalMaterial({
+    new THREE.MeshStandardMaterial({
       color: 0xe6842c,
       emissive: 0x4f2005,
       emissiveIntensity: 0.22,
-      metalness: 0.0,
-      roughness: 0.08,
+      metalness: 0.04,
+      roughness: 0.1,
       transparent: true,
       opacity: 0.86,
     }),
   );
 
   const matClothFabric = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      map: textures.clothGingham,
-      metalness: 0.0,
-      roughness: 0.88,
-      sheen: 0.45,
-      sheenRoughness: 0.8,
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          map: textures.clothGingham,
+          metalness: 0.0,
+          roughness: 0.88,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          map: textures.clothGingham,
+          metalness: 0.0,
+          roughness: 0.88,
+          sheen: 0.45,
+          sheenRoughness: 0.8,
+        }),
   );
 
   const matClothStitch = trackMat(
@@ -202,13 +276,19 @@ export function createTablewareModelLibrary(
   );
 
   const matNapkinLinen = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      map: textures.napkinDamask,
-      metalness: 0.0,
-      roughness: 0.82,
-      sheen: 0.55,
-      sheenColor: new THREE.Color(0xfff5e4),
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          map: textures.napkinDamask,
+          metalness: 0.0,
+          roughness: 0.82,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          map: textures.napkinDamask,
+          metalness: 0.0,
+          roughness: 0.82,
+          sheen: 0.55,
+          sheenColor: new THREE.Color(0xfff5e4),
+        }),
   );
 
   const matCrimsonRibbon = trackMat(
@@ -220,17 +300,24 @@ export function createTablewareModelLibrary(
   );
 
   const matWineBottleGlass = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0x154229,
-      metalness: 0.08,
-      roughness: 0.09,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.06,
-    }),
+    lowPower
+      ? new THREE.MeshStandardMaterial({
+          color: 0x154229,
+          metalness: 0.16,
+          roughness: 0.1,
+          envMapIntensity: 1.45,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0x154229,
+          metalness: 0.08,
+          roughness: 0.09,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.06,
+        }),
   );
 
   const matWineFoil = trackMat(
-    new THREE.MeshPhysicalMaterial({
+    new THREE.MeshStandardMaterial({
       color: 0x7d192b,
       metalness: 0.68,
       roughness: 0.28,
@@ -254,10 +341,15 @@ export function createTablewareModelLibrary(
   );
 
   // --- Shared Prebuilt Geometries for All 10 Tableware Items ---
+  // Adaptive radial/tubular segment counts keep silhouettes smooth while cutting vertex load ~50% on mobile
+  const segHi = lowPower ? 18 : 32;
+  const segMed = lowPower ? 14 : 24;
+  const segLo = lowPower ? 8 : 12;
+  const tubeSeg = lowPower ? 12 : 20;
 
   // Cutlery Rest (used under knife, fork, spoon so they sit elevated & angled cleanly)
-  const geoRestBar = trackGeo(new THREE.CylinderGeometry(0.055, 0.065, 0.48, 12));
-  const geoRestFoot = trackGeo(new THREE.SphereGeometry(0.08, 12, 10));
+  const geoRestBar = trackGeo(new THREE.CylinderGeometry(0.055, 0.065, 0.48, segLo));
+  const geoRestFoot = trackGeo(new THREE.SphereGeometry(0.08, segLo, lowPower ? 6 : 10));
 
   // 1. KNIFE geometries
   const knifeBladeShape = new THREE.Shape();
@@ -272,36 +364,37 @@ export function createTablewareModelLibrary(
       bevelEnabled: true,
       bevelThickness: 0.008,
       bevelSize: 0.008,
-      bevelSegments: 2,
+      bevelSegments: lowPower ? 1 : 2,
+      curveSegments: lowPower ? 6 : 12,
     }),
   );
   geoKnifeBlade.center();
 
-  const geoKnifeBolster = trackGeo(new THREE.CylinderGeometry(0.068, 0.078, 0.11, 14));
-  const geoKnifeHandle = trackGeo(new THREE.CapsuleGeometry(0.068, 0.44, 6, 12));
-  const geoKnifeRivet = trackGeo(new THREE.CylinderGeometry(0.018, 0.018, 0.15, 10));
-  const geoKnifePommel = trackGeo(new THREE.SphereGeometry(0.072, 12, 10));
+  const geoKnifeBolster = trackGeo(new THREE.CylinderGeometry(0.068, 0.078, 0.11, segLo));
+  const geoKnifeHandle = trackGeo(new THREE.CapsuleGeometry(0.068, 0.44, lowPower ? 4 : 6, segLo));
+  const geoKnifeRivet = trackGeo(new THREE.CylinderGeometry(0.018, 0.018, 0.15, lowPower ? 6 : 10));
+  const geoKnifePommel = trackGeo(new THREE.SphereGeometry(0.072, segLo, lowPower ? 6 : 10));
 
   // 2. FORK geometries
-  const geoForkHandle = trackGeo(new THREE.CapsuleGeometry(0.056, 0.56, 6, 12));
+  const geoForkHandle = trackGeo(new THREE.CapsuleGeometry(0.056, 0.56, lowPower ? 4 : 6, segLo));
   const geoForkRidge = trackGeo(new THREE.BoxGeometry(0.04, 0.48, 0.09));
-  const geoForkNeck = trackGeo(new THREE.CylinderGeometry(0.045, 0.06, 0.24, 12));
+  const geoForkNeck = trackGeo(new THREE.CylinderGeometry(0.045, 0.06, 0.24, segLo));
   const geoForkShoulder = trackGeo(new THREE.BoxGeometry(0.28, 0.1, 0.042));
-  const geoForkTine = trackGeo(new THREE.CylinderGeometry(0.011, 0.021, 0.42, 8));
+  const geoForkTine = trackGeo(new THREE.CylinderGeometry(0.011, 0.021, 0.42, lowPower ? 6 : 8));
 
   // 3. SPOON geometries
   const geoSpoonBowl = trackGeo(
-    new THREE.SphereGeometry(0.2, 20, 14, 0, Math.PI * 2, Math.PI * 0.52, Math.PI * 0.48),
+    new THREE.SphereGeometry(0.2, lowPower ? 12 : 20, lowPower ? 8 : 14, 0, Math.PI * 2, Math.PI * 0.52, Math.PI * 0.48),
   );
-  const geoSpoonRim = trackGeo(new THREE.TorusGeometry(0.195, 0.018, 10, 24));
+  const geoSpoonRim = trackGeo(new THREE.TorusGeometry(0.195, 0.018, lowPower ? 6 : 10, segMed));
   const spoonCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(0, 0.08, 0),
     new THREE.Vector3(0, 0.36, -0.05),
     new THREE.Vector3(0, 0.72, -0.02),
     new THREE.Vector3(0, 0.96, 0.03),
   ]);
-  const geoSpoonStem = trackGeo(new THREE.TubeGeometry(spoonCurve, 20, 0.036, 10, false));
-  const geoSpoonTip = trackGeo(new THREE.SphereGeometry(0.082, 14, 10));
+  const geoSpoonStem = trackGeo(new THREE.TubeGeometry(spoonCurve, tubeSeg, 0.036, lowPower ? 7 : 10, false));
+  const geoSpoonTip = trackGeo(new THREE.SphereGeometry(0.082, segLo, lowPower ? 6 : 10));
 
   // 4. CLOTH (Hadr na stůl) geometries
   const clothFoldShape = new THREE.Shape();
@@ -316,15 +409,15 @@ export function createTablewareModelLibrary(
       bevelEnabled: true,
       bevelThickness: 0.028,
       bevelSize: 0.032,
-      bevelSegments: 3,
+      bevelSegments: lowPower ? 1 : 3,
     }),
   );
   geoClothLayer.rotateX(-Math.PI / 2);
-  const geoClothCrease = trackGeo(new THREE.CylinderGeometry(0.085, 0.085, 0.94, 14));
+  const geoClothCrease = trackGeo(new THREE.CylinderGeometry(0.085, 0.085, 0.94, segLo));
   const geoClothHem = trackGeo(new THREE.BoxGeometry(0.96, 0.024, 0.04));
-  const geoClothLoop = trackGeo(new THREE.TorusGeometry(0.08, 0.018, 8, 16));
+  const geoClothLoop = trackGeo(new THREE.TorusGeometry(0.08, 0.018, lowPower ? 6 : 8, lowPower ? 10 : 16));
 
-  // 5. PLATE (Talíř) geometries
+  // 5. PLATE (Talíř) geometries — all prebuilt once (zero per-note allocations)
   const platePoints = [
     new THREE.Vector2(0.0, 0.02),
     new THREE.Vector2(0.28, 0.02),
@@ -338,10 +431,12 @@ export function createTablewareModelLibrary(
     new THREE.Vector2(0.32, 0.062),
     new THREE.Vector2(0.0, 0.055),
   ];
-  const geoPlateBody = trackGeo(new THREE.LatheGeometry(platePoints, 36));
-  const geoPlateGoldRim = trackGeo(new THREE.TorusGeometry(0.635, 0.014, 10, 40));
-  const geoPlateInnerRing = trackGeo(new THREE.TorusGeometry(0.36, 0.008, 8, 32));
-  const geoPlateCenterCrest = trackGeo(new THREE.CylinderGeometry(0.11, 0.11, 0.008, 20));
+  const geoPlateBody = trackGeo(new THREE.LatheGeometry(platePoints, lowPower ? 20 : 36));
+  const geoPlateFoot = trackGeo(new THREE.TorusGeometry(0.34, 0.018, lowPower ? 6 : 8, segHi));
+  const geoPlateStand = trackGeo(new THREE.CylinderGeometry(0.18, 0.26, 0.14, lowPower ? 10 : 16));
+  const geoPlateGoldRim = trackGeo(new THREE.TorusGeometry(0.635, 0.014, lowPower ? 6 : 10, lowPower ? 22 : 40));
+  const geoPlateInnerRing = trackGeo(new THREE.TorusGeometry(0.36, 0.008, lowPower ? 6 : 8, segHi));
+  const geoPlateCenterCrest = trackGeo(new THREE.CylinderGeometry(0.11, 0.11, 0.008, lowPower ? 12 : 20));
 
   // 6. WATER GLASS (Sklenice s vodou) geometries
   const waterOuterPts = [
@@ -352,11 +447,11 @@ export function createTablewareModelLibrary(
     new THREE.Vector2(0.25, 0.11),
     new THREE.Vector2(0.0, 0.11),
   ];
-  const geoWaterGlass = trackGeo(new THREE.LatheGeometry(waterOuterPts, 28));
-  const geoWaterLiquid = trackGeo(new THREE.CylinderGeometry(0.285, 0.24, 0.68, 24));
+  const geoWaterGlass = trackGeo(new THREE.LatheGeometry(waterOuterPts, lowPower ? 16 : 28));
+  const geoWaterLiquid = trackGeo(new THREE.CylinderGeometry(0.285, 0.24, 0.68, segMed));
   const geoIceCube = trackGeo(new THREE.BoxGeometry(0.14, 0.13, 0.14));
-  const geoLemonSlice = trackGeo(new THREE.CylinderGeometry(0.16, 0.16, 0.036, 18, 1, false, 0, Math.PI * 1.15));
-  const geoLemonPulp = trackGeo(new THREE.CylinderGeometry(0.135, 0.135, 0.04, 18, 1, false, 0, Math.PI * 1.15));
+  const geoLemonSlice = trackGeo(new THREE.CylinderGeometry(0.16, 0.16, 0.036, lowPower ? 10 : 18, 1, false, 0, Math.PI * 1.15));
+  const geoLemonPulp = trackGeo(new THREE.CylinderGeometry(0.135, 0.135, 0.04, lowPower ? 10 : 18, 1, false, 0, Math.PI * 1.15));
 
   // 7. BEER MUG (Sklenice s pivem — Český půllitr) geometries
   const beerOuterPts = [
@@ -368,7 +463,7 @@ export function createTablewareModelLibrary(
     new THREE.Vector2(0.31, 0.18),
     new THREE.Vector2(0.0, 0.18),
   ];
-  const geoBeerMug = trackGeo(new THREE.LatheGeometry(beerOuterPts, 20));
+  const geoBeerMug = trackGeo(new THREE.LatheGeometry(beerOuterPts, lowPower ? 14 : 20));
   const beerHandleCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(0.33, 0.86, 0),
     new THREE.Vector3(0.57, 0.82, 0),
@@ -376,11 +471,11 @@ export function createTablewareModelLibrary(
     new THREE.Vector3(0.53, 0.26, 0),
     new THREE.Vector3(0.33, 0.24, 0),
   ]);
-  const geoBeerHandle = trackGeo(new THREE.TubeGeometry(beerHandleCurve, 20, 0.055, 10, false));
-  const geoBeerLiquid = trackGeo(new THREE.CylinderGeometry(0.305, 0.295, 0.68, 20));
-  const geoBeerFoamCap = trackGeo(new THREE.CylinderGeometry(0.315, 0.305, 0.22, 20));
-  const geoBeerFoamPuff = trackGeo(new THREE.SphereGeometry(0.14, 12, 10));
-  const geoBeerBand = trackGeo(new THREE.TorusGeometry(0.355, 0.015, 8, 24));
+  const geoBeerHandle = trackGeo(new THREE.TubeGeometry(beerHandleCurve, tubeSeg, 0.055, lowPower ? 7 : 10, false));
+  const geoBeerLiquid = trackGeo(new THREE.CylinderGeometry(0.305, 0.295, 0.68, lowPower ? 14 : 20));
+  const geoBeerFoamCap = trackGeo(new THREE.CylinderGeometry(0.315, 0.305, 0.22, lowPower ? 14 : 20));
+  const geoBeerFoamPuff = trackGeo(new THREE.SphereGeometry(0.14, lowPower ? 8 : 12, lowPower ? 6 : 10));
+  const geoBeerBand = trackGeo(new THREE.TorusGeometry(0.355, 0.015, lowPower ? 6 : 8, segMed));
 
   // 8. SHOT GLASS (Panák) geometries
   const shotPts = [
@@ -391,17 +486,17 @@ export function createTablewareModelLibrary(
     new THREE.Vector2(0.195, 0.2), // thick heavy base
     new THREE.Vector2(0.0, 0.2),
   ];
-  const geoShotGlass = trackGeo(new THREE.LatheGeometry(shotPts, 24));
-  const geoShotBaseSlug = trackGeo(new THREE.CylinderGeometry(0.195, 0.205, 0.19, 24));
-  const geoShotLiquid = trackGeo(new THREE.CylinderGeometry(0.228, 0.192, 0.34, 24));
-  const geoShotGoldRim = trackGeo(new THREE.TorusGeometry(0.262, 0.011, 8, 28));
+  const geoShotGlass = trackGeo(new THREE.LatheGeometry(shotPts, segMed));
+  const geoShotBaseSlug = trackGeo(new THREE.CylinderGeometry(0.195, 0.205, 0.19, segMed));
+  const geoShotLiquid = trackGeo(new THREE.CylinderGeometry(0.228, 0.192, 0.34, segMed));
+  const geoShotGoldRim = trackGeo(new THREE.TorusGeometry(0.262, 0.011, lowPower ? 6 : 8, segMed));
 
   // 9. NAPKIN (Ubrousek) geometries
   const geoNapkinCone = trackGeo(new THREE.ConeGeometry(0.34, 0.98, 4, 1));
   const geoNapkinWing = trackGeo(new THREE.ConeGeometry(0.24, 0.86, 4, 1));
-  const geoNapkinRing = trackGeo(new THREE.TorusGeometry(0.22, 0.042, 14, 28));
-  const geoNapkinRibbon = trackGeo(new THREE.TorusGeometry(0.245, 0.018, 10, 28));
-  const geoNapkinBase = trackGeo(new THREE.CylinderGeometry(0.31, 0.34, 0.06, 16));
+  const geoNapkinRing = trackGeo(new THREE.TorusGeometry(0.22, 0.042, lowPower ? 8 : 14, segMed));
+  const geoNapkinRibbon = trackGeo(new THREE.TorusGeometry(0.245, 0.018, lowPower ? 6 : 10, segMed));
+  const geoNapkinBase = trackGeo(new THREE.CylinderGeometry(0.31, 0.34, 0.06, lowPower ? 10 : 16));
 
   // 10. WINE BOTTLE (Láhev vína) geometries
   const winePts = [
@@ -419,14 +514,14 @@ export function createTablewareModelLibrary(
     new THREE.Vector2(0.092, 1.59),
     new THREE.Vector2(0.092, 1.50),
   ];
-  const geoWineBottle = trackGeo(new THREE.LatheGeometry(winePts, 32));
-  const geoWineFoil = trackGeo(new THREE.CylinderGeometry(0.114, 0.116, 0.28, 24, 1, true));
-  const geoWineFoilCap = trackGeo(new THREE.CylinderGeometry(0.128, 0.128, 0.055, 24));
-  const geoWineCork = trackGeo(new THREE.CylinderGeometry(0.088, 0.082, 0.13, 18));
+  const geoWineBottle = trackGeo(new THREE.LatheGeometry(winePts, segHi));
+  const geoWineFoil = trackGeo(new THREE.CylinderGeometry(0.114, 0.116, 0.28, segMed, 1, true));
+  const geoWineFoilCap = trackGeo(new THREE.CylinderGeometry(0.128, 0.128, 0.055, segMed));
+  const geoWineCork = trackGeo(new THREE.CylinderGeometry(0.088, 0.082, 0.13, lowPower ? 10 : 18));
   const geoWineLabel = trackGeo(
-    new THREE.CylinderGeometry(0.306, 0.306, 0.44, 28, 1, true, -Math.PI * 0.45, Math.PI * 0.9),
+    new THREE.CylinderGeometry(0.306, 0.306, 0.44, lowPower ? 16 : 28, 1, true, -Math.PI * 0.45, Math.PI * 0.9),
   );
-  const geoWineNeckCollar = trackGeo(new THREE.TorusGeometry(0.118, 0.012, 8, 24));
+  const geoWineNeckCollar = trackGeo(new THREE.TorusGeometry(0.118, 0.012, lowPower ? 6 : 8, segMed));
 
   function makeMesh(
     geo: THREE.BufferGeometry,
@@ -435,8 +530,8 @@ export function createTablewareModelLibrary(
     renderOrder = 0,
   ): THREE.Mesh {
     const m = new THREE.Mesh(geo, mat);
-    m.castShadow = castShadow;
-    m.receiveShadow = true;
+    m.castShadow = !lowPower && castShadow;
+    m.receiveShadow = !lowPower;
     m.renderOrder = renderOrder;
     return m;
   }
@@ -595,11 +690,7 @@ export function createTablewareModelLibrary(
         const body = makeMesh(geoPlateBody, matPorcelain);
         root.add(body);
 
-        const foot = makeMesh(
-          trackGeo(new THREE.TorusGeometry(0.34, 0.018, 8, 32)),
-          matPorcelainMatteFoot,
-          false,
-        );
+        const foot = makeMesh(geoPlateFoot, matPorcelainMatteFoot, false);
         foot.rotation.x = Math.PI / 2;
         foot.position.y = 0.018;
         root.add(foot);
@@ -623,10 +714,7 @@ export function createTablewareModelLibrary(
           c.position.y += 0.32;
           c.rotation.x += 0.42;
         });
-        const stand = makeMesh(
-          trackGeo(new THREE.CylinderGeometry(0.18, 0.26, 0.14, 16)),
-          matBrushedBrass,
-        );
+        const stand = makeMesh(geoPlateStand, matBrushedBrass);
         stand.position.y = 0.07;
         root.add(stand);
         break;
@@ -669,13 +757,19 @@ export function createTablewareModelLibrary(
         foamCap.position.y = 0.95;
         root.add(foamCap);
 
-        const puffPositions: [number, number, number, number][] = [
-          [0, 1.1, 0, 1.15],
-          [0.16, 1.07, 0.08, 0.85],
-          [-0.15, 1.08, 0.09, 0.9],
-          [0.05, 1.06, -0.16, 0.88],
-          [-0.12, 1.05, -0.12, 0.8],
-        ];
+        const puffPositions: [number, number, number, number][] = lowPower
+          ? [
+              [0, 1.1, 0, 1.18],
+              [0.16, 1.07, 0.08, 0.88],
+              [-0.15, 1.08, -0.05, 0.92],
+            ]
+          : [
+              [0, 1.1, 0, 1.15],
+              [0.16, 1.07, 0.08, 0.85],
+              [-0.15, 1.08, 0.09, 0.9],
+              [0.05, 1.06, -0.16, 0.88],
+              [-0.12, 1.05, -0.12, 0.8],
+            ];
         for (const [px, py, pz, ps] of puffPositions) {
           const puff = makeMesh(geoBeerFoamPuff, matBeerFoam, false, 2);
           puff.position.set(px, py, pz);

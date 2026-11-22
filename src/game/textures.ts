@@ -46,17 +46,29 @@ function finalizeDataTexture(
   return tex;
 }
 
-export function createProceduralTextures(maxAnisotropy: number): ProceduralTexturePack {
+export function createProceduralTextures(
+  maxAnisotropy: number,
+  lowPower = false,
+): ProceduralTexturePack {
+  const aniso = lowPower ? Math.min(2, maxAnisotropy) : Math.min(8, maxAnisotropy);
+  const woodSize = lowPower ? 256 : 512;
+  const clothSize = lowPower ? 128 : 256;
+  const napkinSize = lowPower ? 128 : 256;
+  const labelW = lowPower ? 256 : 512;
+  const labelH = lowPower ? 128 : 256;
+
   // 1. Rich Walnut Dining Track Wood Albedo + Roughness
   const woodCanvas = document.createElement('canvas');
-  woodCanvas.width = 512;
-  woodCanvas.height = 512;
+  woodCanvas.width = woodSize;
+  woodCanvas.height = woodSize;
   const wCtx = woodCanvas.getContext('2d')!;
+  if (lowPower) wCtx.scale(0.5, 0.5);
 
   const roughCanvas = document.createElement('canvas');
-  roughCanvas.width = 512;
-  roughCanvas.height = 512;
+  roughCanvas.width = woodSize;
+  roughCanvas.height = woodSize;
   const rCtx = roughCanvas.getContext('2d')!;
+  if (lowPower) rCtx.scale(0.5, 0.5);
 
   wCtx.fillStyle = '#2a1c14';
   wCtx.fillRect(0, 0, 512, 512);
@@ -95,14 +107,15 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
     wCtx.fillRect(p * plankW, 0, 2, 512);
   }
 
-  const woodAlbedo = finalizeColorTexture(woodCanvas, maxAnisotropy, 1, 6);
-  const woodRoughness = finalizeDataTexture(roughCanvas, maxAnisotropy, 1, 6);
+  const woodAlbedo = finalizeColorTexture(woodCanvas, aniso, 1, 6);
+  const woodRoughness = finalizeDataTexture(roughCanvas, aniso, 1, 6);
 
   // 2. Checkered Bistro Table Cloth (Hadr na stůl)
   const clothCanvas = document.createElement('canvas');
-  clothCanvas.width = 256;
-  clothCanvas.height = 256;
+  clothCanvas.width = clothSize;
+  clothCanvas.height = clothSize;
   const cCtx = clothCanvas.getContext('2d')!;
+  if (lowPower) cCtx.scale(0.5, 0.5);
   cCtx.fillStyle = '#f3eadb';
   cCtx.fillRect(0, 0, 256, 256);
 
@@ -129,13 +142,14 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
     cCtx.lineTo(256, i);
     cCtx.stroke();
   }
-  const clothGingham = finalizeColorTexture(clothCanvas, maxAnisotropy, 2, 2);
+  const clothGingham = finalizeColorTexture(clothCanvas, aniso, 2, 2);
 
   // 3. Ivory Damask Linen Napkin (Ubrousek)
   const napkinCanvas = document.createElement('canvas');
-  napkinCanvas.width = 256;
-  napkinCanvas.height = 256;
+  napkinCanvas.width = napkinSize;
+  napkinCanvas.height = napkinSize;
   const nCtx = napkinCanvas.getContext('2d')!;
+  if (lowPower) nCtx.scale(0.5, 0.5);
   nCtx.fillStyle = '#f2e8d5';
   nCtx.fillRect(0, 0, 256, 256);
   nCtx.strokeStyle = 'rgba(186, 162, 122, 0.28)';
@@ -155,13 +169,14 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
   nCtx.strokeStyle = 'rgba(176, 134, 66, 0.55)';
   nCtx.lineWidth = 4;
   nCtx.strokeRect(10, 10, 236, 236);
-  const napkinDamask = finalizeColorTexture(napkinCanvas, maxAnisotropy);
+  const napkinDamask = finalizeColorTexture(napkinCanvas, aniso);
 
   // 4. Vintage Wine Bottle Label (Láhev vína)
   const labelCanvas = document.createElement('canvas');
-  labelCanvas.width = 512;
-  labelCanvas.height = 256;
+  labelCanvas.width = labelW;
+  labelCanvas.height = labelH;
   const lCtx = labelCanvas.getContext('2d')!;
+  if (lowPower) lCtx.scale(0.5, 0.5);
   lCtx.fillStyle = '#f3e9d2';
   lCtx.fillRect(0, 0, 512, 256);
 
@@ -196,13 +211,15 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
   lCtx.font = 'bold 18px Georgia, serif';
   lCtx.fillText('1924', 256, 210);
 
-  const wineLabel = finalizeColorTexture(labelCanvas, maxAnisotropy);
+  const wineLabel = finalizeColorTexture(labelCanvas, aniso);
 
   // 5. Soft Radial Contact Shadow Texture
+  const shadowSize = lowPower ? 64 : 128;
   const shadowCanvas = document.createElement('canvas');
-  shadowCanvas.width = 128;
-  shadowCanvas.height = 128;
+  shadowCanvas.width = shadowSize;
+  shadowCanvas.height = shadowSize;
   const sCtx = shadowCanvas.getContext('2d')!;
+  if (lowPower) sCtx.scale(0.5, 0.5);
   const grad = sCtx.createRadialGradient(64, 64, 8, 64, 64, 60);
   grad.addColorStop(0, 'rgba(8, 5, 3, 0.72)');
   grad.addColorStop(0.55, 'rgba(8, 5, 3, 0.34)');
