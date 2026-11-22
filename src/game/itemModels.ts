@@ -25,21 +25,13 @@ export function createTablewareModelLibrary(): TablewareModelLibrary {
     return m;
   };
 
-  // --- Shared Unlit Opaque Arcade Vector Palette (100% MeshBasicMaterial, zero alpha) ---
-  const matCache = new Map<number, THREE.MeshBasicMaterial>();
-  const flatMat = (hex: number): THREE.MeshBasicMaterial => {
-    let m = matCache.get(hex);
-    if (!m) {
-      m = trackMat(
-        new THREE.MeshBasicMaterial({
-          color: hex,
-          side: THREE.DoubleSide,
-        }),
-      );
-      matCache.set(hex, m);
-    }
-    return m;
-  };
+  // --- Single Shared Unlit Opaque Vertex-Color Material (1 shader bind, 1 draw call per item) ---
+  const sharedVectorMat = trackMat(
+    new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      side: THREE.DoubleSide,
+    }),
+  );
 
   const C = {
     outline: 0x090814,
@@ -118,21 +110,18 @@ export function createTablewareModelLibrary(): TablewareModelLibrary {
     return s;
   }
 
-  interface VectorLayerSpec {
-    geo: THREE.BufferGeometry;
-    mat: THREE.MeshBasicMaterial;
-    zOffset: number; // positive distance from center plane; mirrored automatically on back face
-  }
-
   interface VectorTokenBlueprint {
-    slabGeo: THREE.BufferGeometry;
-    layers: VectorLayerSpec[];
-    halfDepth: number;
-    yOffset: number;
+    mergedGeo: THREE.BufferGeometry;
     scale: number;
   }
 
-  // Helper to prebuild an unlit double-sided flat-vector token with crisp 3D dark edge backing
+  const tmpColor = new THREE.Color();
+
+  /**
+   * Bakes the extruded dark outline slab + all front (+Z) and back (-Z) flat-vector layers
+   * into ONE non-indexed BufferGeometry containing only `position` and linear `color`.
+   * Cuts per-item draw calls from 15–33 down to 1 and halves GPU vertex memory bandwidth.
+   */
   function buildBlueprint(
     outlineShape: THREE.Shape,
     layerDefs: { shape: THREE.Shape; color: number; depthRank: number; curveSegs?: number }[],
@@ -140,26 +129,87 @@ export function createTablewareModelLibrary(): TablewareModelLibrary {
   ): VectorTokenBlueprint {
     const depth = options?.depth ?? 0.08;
     const halfDepth = depth * 0.5;
-    const slabGeo = trackGeo(
-      new THREE.ExtrudeGeometry(outlineShape, {
-        depth,
-        bevelEnabled: false,
-        curveSegments: options?.outlineSegs ?? 12,
-      }),
-    );
-    slabGeo.translate(0, 0, -halfDepth);
+    const yOffset = options?.yOffset ?? 0.02;
 
-    const layers: VectorLayerSpec[] = layerDefs.map((ld) => ({
-      geo: trackGeo(new THREE.ShapeGeometry(ld.shape, ld.curveSegs ?? 12)),
-      mat: flatMat(ld.color),
-      zOffset: halfDepth + 0.008 + ld.depthRank * 0.009,
-    }));
+    const parts: { pos: Float32Array; colorHex: number; yOff: number; zOff: number; flipBack: boolean }[] = [];
+    let totalVertices = 0;
+
+    const pushGeoPart = (
+      rawGeo: THREE.BufferGeometry,
+      colorHex: number,
+      zOff: number,
+      flipBack: boolean,
+    ): void => {
+      const nonIndexed = rawGeo.index ? rawGeo.toNonIndexed() : rawGeo;
+      const posAttr = nonIndexed.getAttribute('position');
+      const arr = new Float32Array(posAttr.count * 3);
+      for (let i = 0; i < posAttr.count; i++) {
+        const i3 = i * 3;
+        arr[i3] = posAttr.getX(i);
+        arr[i3 + 1] = posAttr.getY(i);
+        arr[i3 + 2] = posAttr.getZ(i);
+      }
+      if (nonIndexed !== rawGeo) nonIndexed.dispose();
+      parts.push({ pos: arr, colorHex, yOff: yOffset, zOff, flipBack });
+      totalVertices += posAttr.count;
+    };
+
+    // 1. Dark contour slab
+    const slabGeo = new THREE.ExtrudeGeometry(outlineShape, {
+      depth,
+      bevelEnabled: false,
+      curveSegments: Math.min(options?.outlineSegs ?? 10, 16),
+    });
+    slabGeo.translate(0, 0, -halfDepth);
+    pushGeoPart(slabGeo, C.outline, 0, false);
+    slabGeo.dispose();
+
+    // 2. Front (+Z) and back (-Z) flat-vector color layers
+    for (let i = 0; i < layerDefs.length; i++) {
+      const ld = layerDefs[i];
+      const segs = Math.min(ld.curveSegs ?? 10, 16);
+      const shapeGeo = new THREE.ShapeGeometry(ld.shape, segs);
+      const zOff = halfDepth + 0.008 + ld.depthRank * 0.009;
+      pushGeoPart(shapeGeo, ld.color, zOff, false);
+      pushGeoPart(shapeGeo, ld.color, -zOff, true);
+      shapeGeo.dispose();
+    }
+
+    const mergedPositions = new Float32Array(totalVertices * 3);
+    const mergedColors = new Float32Array(totalVertices * 3);
+    let cursor = 0;
+
+    for (let p = 0; p < parts.length; p++) {
+      const part = parts[p];
+      tmpColor.setHex(part.colorHex);
+      const r = tmpColor.r;
+      const g = tmpColor.g;
+      const b = tmpColor.b;
+      const src = part.pos;
+      const vertCount = src.length / 3;
+      const signX = part.flipBack ? -1 : 1;
+      const signZ = part.flipBack ? -1 : 1;
+
+      for (let v = 0; v < vertCount; v++) {
+        const s3 = v * 3;
+        const d3 = (cursor + v) * 3;
+        mergedPositions[d3] = src[s3] * signX;
+        mergedPositions[d3 + 1] = src[s3 + 1] + part.yOff;
+        mergedPositions[d3 + 2] = src[s3 + 2] * signZ + part.zOff;
+        mergedColors[d3] = r;
+        mergedColors[d3 + 1] = g;
+        mergedColors[d3 + 2] = b;
+      }
+      cursor += vertCount;
+    }
+
+    const mergedGeo = trackGeo(new THREE.BufferGeometry());
+    mergedGeo.setAttribute('position', new THREE.BufferAttribute(mergedPositions, 3));
+    mergedGeo.setAttribute('color', new THREE.BufferAttribute(mergedColors, 3));
+    mergedGeo.computeBoundingSphere();
 
     return {
-      slabGeo,
-      layers,
-      halfDepth,
-      yOffset: options?.yOffset ?? 0.02,
+      mergedGeo,
       scale: options?.scale ?? 1.0,
     };
   }
@@ -565,30 +615,14 @@ export function createTablewareModelLibrary(): TablewareModelLibrary {
     wine: bpWine,
   };
 
-  const outlineMat = flatMat(C.outline);
-
   function createItemMesh(type: ItemType): THREE.Group {
     const bp = BLUEPRINTS[type];
     const root = new THREE.Group();
 
-    // Solid dark vector contour body (3D arcade slab with zero shading/shadows)
-    const slab = new THREE.Mesh(bp.slabGeo, outlineMat);
-    slab.position.y = bp.yOffset;
-    root.add(slab);
-
-    // Crisp flat vector color layers on both front (+Z) and back (-Z) faces
-    for (let i = 0; i < bp.layers.length; i++) {
-      const layer = bp.layers[i];
-
-      const front = new THREE.Mesh(layer.geo, layer.mat);
-      front.position.set(0, bp.yOffset, layer.zOffset);
-      root.add(front);
-
-      const back = new THREE.Mesh(layer.geo, layer.mat);
-      back.position.set(0, bp.yOffset, -layer.zOffset);
-      back.rotation.y = Math.PI;
-      root.add(back);
-    }
+    const mesh = new THREE.Mesh(bp.mergedGeo, sharedVectorMat);
+    mesh.matrixAutoUpdate = false;
+    mesh.updateMatrix();
+    root.add(mesh);
 
     root.scale.setScalar(bp.scale);
     return root;

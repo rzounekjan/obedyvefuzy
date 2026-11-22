@@ -200,7 +200,14 @@ export class RhythmAudioEngine {
   }
 
   public update(): void {
-    if (!this.running || this.paused || !this.activeLevel || !this.ctx || this.ctx.state !== 'running') {
+    if (
+      !this.running ||
+      this.paused ||
+      this.playerState === 'playing' ||
+      !this.activeLevel ||
+      !this.ctx ||
+      this.ctx.state !== 'running'
+    ) {
       return;
     }
     const level = this.activeLevel;
@@ -212,15 +219,12 @@ export class RhythmAudioEngine {
 
     const maxEighth = Math.floor((lookaheadEnd - this.startAudioTime) / secPerEighth);
     const totalTrackEighths = (level.durationBeats + 8) * 2;
-    const mp3Active = this.playerState === 'playing';
 
     for (let step = this.lastScheduledStep + 1; step <= maxEighth; step++) {
       if (step < 0 || step > totalTrackEighths) continue;
-      if (!mp3Active) {
-        const stepTime = this.startAudioTime + step * secPerEighth;
-        if (stepTime >= now - 0.04) {
-          this.scheduleFallbackGrooveStep(step, stepTime, track);
-        }
+      const stepTime = this.startAudioTime + step * secPerEighth;
+      if (stepTime >= now - 0.04) {
+        this.scheduleFallbackGrooveStep(step, stepTime, track);
       }
       this.lastScheduledStep = step;
     }

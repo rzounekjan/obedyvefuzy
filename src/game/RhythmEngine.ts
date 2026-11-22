@@ -17,17 +17,20 @@ import type {
   ServiceCallout,
 } from './types';
 
-// --- Track Layout Constants ---
+// --- Track Layout Constants (100% Decoupled from Music BPM for Silky-Smooth Constant Velocity) ---
 const LANE_COUNT = 4;
 const LANE_WIDTH = 1.85;
 const TRACK_WIDTH = LANE_COUNT * LANE_WIDTH; // 7.4
 const TRACK_LENGTH = 56;
 const STRIKE_Z = 3.2;
 const SPAWN_Z = -39;
-const UNITS_PER_BEAT = 4.6;
+const SCROLL_UNITS_PER_SEC = 10.6; // Constant smooth optical glide velocity independent of BPM
+const HIGHWAY_BAR_COUNT = 12;
+const HIGHWAY_BAR_SPACING = 4.2;
+const LEAD_IN_SEC = 2.15;
 
-// Timing windows (in seconds) — crisp & fair
-const PERFECT_SEC = 0.088;
+// Timing windows (in seconds) — crisp, fair & 100% locked to visual strike-bar alignment
+const PERFECT_SEC = 0.09;
 const GREAT_SEC = 0.165;
 const GOOD_SEC = 0.245;
 const MISS_PASS_SEC = 0.265;
@@ -63,6 +66,7 @@ const _planeHit = new THREE.Vector3();
 
 interface ActiveTileVisual {
   note: NoteEvent;
+  noteTimeSec: number;
   itemType: ItemType;
   baseItemScale: number;
   baseAccentHex: number;
@@ -160,11 +164,11 @@ export class RhythmEngine {
   private modelLib: TablewareModelLibrary;
   public audio: RhythmAudioEngine;
 
-  // Frame loop management
+  // Frame loop management & smooth VSync clock (100% decoupled from AudioContext quantum steps)
   private frameId = 0;
   private disposed = false;
   private lastTimeMs = 0;
-  private lastHudEmitMs = 0;
+  private prevSmoothDt = 0;
   private elapsedIdle = 0;
 
   // Game state
@@ -172,8 +176,13 @@ export class RhythmEngine {
   private currentLevel: LevelDefinition = getLevelById(1);
   private currentTrack: MusicTrack = getMusicTrackById(DEFAULT_MUSIC_TRACK_ID);
   private notes: NoteEvent[] = [];
+  private noteTimesSec: Float64Array = new Float64Array(0);
+  private nextSpawnIdx = 0;
+  private nextMissIdx = 0;
   private activeVisuals: Map<number, ActiveTileVisual> = new Map();
   private tilePool: Map<ItemType, ActiveTileVisual[]> = new Map();
+  private toRemoveIds: number[] = [];
+  private toRemoveVisuals: ActiveTileVisual[] = [];
   private score = 0;
   private combo = 0;
   private maxCombo = 0;
@@ -199,13 +208,15 @@ export class RhythmEngine {
   private laneFlashSeq: number[] = [0, 0, 0, 0];
   private laneFlashTimer: number[] = [0, 0, 0, 0];
   private lanePressSpring: number[] = [0, 0, 0, 0];
+  private lastEmittedProgressPct = -1;
+  private cachedLanePrompts: [LanePrompt, LanePrompt, LanePrompt, LanePrompt];
 
-  // Visual juice & beat reactivity
-  private cameraShake = 0;
-  private beatPulse = 0;
-  private lastBeatInt = -1;
-  private hitstopTimer = 0;
-  private currentBeat = 0;
+  // Smooth continuous simulation timeline (seconds) — decoupled from BPM
+  private simTimeSec = 0;
+  private endTimeSec = 30;
+  private pulsePhase = 0;
+  private hitFlashPulse = 0;
+  private playCameraSettled = false;
   private levelAccentColor = new THREE.Color(0xffd166);
 
   // Responsive viewport-adaptive camera metrics (ensures all 4 lanes fit on portrait phones)
@@ -216,14 +227,16 @@ export class RhythmEngine {
   private playLookZ = -4.4;
 
   // Scene objects (100% MeshBasicMaterial — zero lights, zero shadows, zero transparency)
-  private beatLines: THREE.Mesh[] = [];
+  private beatLinesMesh!: THREE.InstancedMesh;
   private beatLineMat!: THREE.MeshBasicMaterial;
   private strikePads: THREE.Mesh[] = [];
   private strikePadMats: THREE.MeshBasicMaterial[] = [];
   private strikePadTrimMats: THREE.MeshBasicMaterial[] = [];
   private strikeBarMat!: THREE.MeshBasicMaterial;
-  private eqBarsLeft: THREE.Mesh[] = [];
-  private eqBarsRight: THREE.Mesh[] = [];
+  private eqMesh!: THREE.InstancedMesh;
+  private eqPositionsX: Float32Array = new Float32Array(0);
+  private eqPositionsZ: Float32Array = new Float32Array(0);
+  private eqScalesY: Float32Array = new Float32Array(0);
   private eqBarMat!: THREE.MeshBasicMaterial;
   private archTrimMat!: THREE.MeshBasicMaterial;
   private showcaseTrimMat!: THREE.MeshBasicMaterial;
@@ -232,11 +245,13 @@ export class RhythmEngine {
   private showcaseGroup: THREE.Group;
   private showcaseItemMesh: THREE.Group | null = null;
 
-  // Pooled effects (zero GC, 100% opaque)
+  // Pooled effects (zero GC, 100% opaque, O(1) idle early-out)
   private shockwaves: ShockwaveRing[] = [];
+  private activeShockwaveCount = 0;
   private particles: Particle[] = [];
+  private activeParticleCount = 0;
   private particleMesh!: THREE.InstancedMesh;
-  private maxParticles = 140;
+  private maxParticles = 120;
 
   // Raycaster for direct 3D lane tap against mathematical y=0 plane
   private raycaster = new THREE.Raycaster();
@@ -272,16 +287,19 @@ export class RhythmEngine {
     this.isSoftwareGl = tier.isSoftwareGl;
     this.isMobileLite = tier.isMobileLite;
     this.lowPower = this.isSoftwareGl || this.isMobileLite;
-    this.maxParticles = this.lowPower ? 72 : 160;
+    this.maxParticles = this.lowPower ? 56 : 140;
 
-    // Crisp arcade pixel ratio (Moto G14 Mali-G57 runs flat unlit shaders effortlessly at 1.4x)
+    // Silky-smooth 60 FPS pixel ratio budget (disabling MSAA & alpha compositing on Mali-G57 slashes fillrate ~60%)
     const dpr = window.devicePixelRatio || 1;
-    this.maxPixelRatio = this.isSoftwareGl ? 1 : this.isMobileLite ? Math.min(dpr, 1.4) : Math.min(dpr, 2);
+    this.maxPixelRatio = this.isSoftwareGl ? 1 : this.isMobileLite ? Math.min(dpr, 1.15) : Math.min(dpr, 2);
     this.currentPixelRatio = this.maxPixelRatio;
 
-    // 1. Renderer setup — unlit arcade (zero shadow map, zero tone-mapping desaturation, zero stencil)
+    this.cachedLanePrompts = this.createStaticLanePrompts(this.currentLevel);
+
+    // 1. Renderer setup — unlit opaque arcade (zero alpha blend, zero MSAA on mobile, zero shadows, zero stencil)
     this.renderer = new THREE.WebGLRenderer({
-      antialias: !this.isSoftwareGl,
+      alpha: false,
+      antialias: !this.lowPower,
       stencil: false,
       powerPreference: 'high-performance',
     });
@@ -356,7 +374,29 @@ export class RhythmEngine {
 
     this.emitHud(true);
     this.lastTimeMs = performance.now();
-    this.tick();
+    this.tick(this.lastTimeMs);
+  }
+
+  private freezeStaticObject(obj: THREE.Object3D): void {
+    obj.matrixAutoUpdate = false;
+    obj.updateMatrix();
+  }
+
+  private createStaticLanePrompts(level: LevelDefinition): [LanePrompt, LanePrompt, LanePrompt, LanePrompt] {
+    return [0, 1, 2, 3].map((lane) => {
+      const item = level.laneItems[lane];
+      return {
+        lane: lane as 0 | 1 | 2 | 3,
+        item,
+        isUnique: item === level.uniqueItem,
+        proximity: 0,
+        inHitWindow: false,
+        isNextRow: false,
+        hasNote: false,
+        flashKind: null,
+        flashSeq: 0,
+      };
+    }) as [LanePrompt, LanePrompt, LanePrompt, LanePrompt];
   }
 
   private trackEnvGeo<T extends THREE.BufferGeometry>(g: T): T {
@@ -376,6 +416,7 @@ export class RhythmEngine {
     const hallFloor = new THREE.Mesh(floorGeo, floorMat);
     hallFloor.rotation.x = -Math.PI / 2;
     hallFloor.position.set(0, -0.45, -16);
+    this.freezeStaticObject(hallFloor);
     this.scene.add(hallFloor);
 
     // Chunky dark outline base beneath the 4-lane highway
@@ -384,6 +425,7 @@ export class RhythmEngine {
       this.trackEnvMat(new THREE.MeshBasicMaterial({ color: 0x090814 })),
     );
     deckOutline.position.set(0, -0.22, -16);
+    this.freezeStaticObject(deckOutline);
     this.scene.add(deckOutline);
 
     // 4 alternating flat arcade lane strips (high contrast, zero texture overhead)
@@ -394,6 +436,7 @@ export class RhythmEngine {
       const strip = new THREE.Mesh(laneGeo, lane % 2 === 0 ? laneMatEven : laneMatOdd);
       strip.rotation.x = -Math.PI / 2;
       strip.position.set(LANE_X[lane], -0.02, -16);
+      this.freezeStaticObject(strip);
       this.scene.add(strip);
     }
 
@@ -405,10 +448,12 @@ export class RhythmEngine {
     for (const side of [-1, 1]) {
       const rail = new THREE.Mesh(railOuterGeo, railOuterMat);
       rail.position.set(side * (TRACK_WIDTH / 2 + 0.22), 0.06, -16);
+      this.freezeStaticObject(rail);
       this.scene.add(rail);
 
       const trim = new THREE.Mesh(railInnerGeo, railInnerMat);
       trim.position.set(side * (TRACK_WIDTH / 2 + 0.06), 0.06, -16);
+      this.freezeStaticObject(trim);
       this.scene.add(trim);
     }
 
@@ -420,18 +465,24 @@ export class RhythmEngine {
       const x = -TRACK_WIDTH / 2 + i * LANE_WIDTH;
       const div = new THREE.Mesh(dividerGeo, i === 2 ? divGoldMat : divCyanMat);
       div.position.set(x, 0.01, -16);
+      this.freezeStaticObject(div);
       this.scene.add(div);
     }
 
-    // Scrolling flat arcade tempo bars along the track
+    // Scrolling flat arcade speed bars batched into 1 single InstancedMesh draw call
     const beatLineGeo = this.trackEnvGeo(new THREE.BoxGeometry(TRACK_WIDTH - 0.1, 0.025, 0.1));
     this.beatLineMat = this.trackEnvMat(new THREE.MeshBasicMaterial({ color: 0x3a346e }));
-    for (let i = 0; i < 12; i++) {
-      const line = new THREE.Mesh(beatLineGeo, this.beatLineMat);
-      line.position.set(0, 0.015, STRIKE_Z - i * UNITS_PER_BEAT);
-      this.scene.add(line);
-      this.beatLines.push(line);
+    this.beatLinesMesh = new THREE.InstancedMesh(beatLineGeo, this.beatLineMat, HIGHWAY_BAR_COUNT);
+    this.beatLinesMesh.frustumCulled = false;
+    _dummy.rotation.set(0, 0, 0);
+    _dummy.scale.set(1, 1, 1);
+    for (let i = 0; i < HIGHWAY_BAR_COUNT; i++) {
+      _dummy.position.set(0, 0.015, STRIKE_Z - i * HIGHWAY_BAR_SPACING);
+      _dummy.updateMatrix();
+      this.beatLinesMesh.setMatrixAt(i, _dummy.matrix);
     }
+    this.beatLinesMesh.instanceMatrix.needsUpdate = true;
+    this.scene.add(this.beatLinesMesh);
 
     // Bold Arcade Strike Bar across all 4 lanes at z = STRIKE_Z
     this.strikeBarMat = this.trackEnvMat(new THREE.MeshBasicMaterial({ color: 0xffd166 }));
@@ -440,6 +491,7 @@ export class RhythmEngine {
       this.strikeBarMat,
     );
     strikeBar.position.set(0, 0.03, STRIKE_Z);
+    this.freezeStaticObject(strikeBar);
     this.scene.add(strikeBar);
 
     // 4 Opaque Arcade Strike Pads (framed dark pads that punch bright neon colors on hit)
@@ -453,6 +505,7 @@ export class RhythmEngine {
       padGroup.position.set(LANE_X[lane], 0.02, STRIKE_Z);
       const padInner = new THREE.Mesh(padInnerGeo, padMat);
       padInner.position.y = 0.01;
+      this.freezeStaticObject(padInner);
       padGroup.add(padInner);
 
       this.scene.add(padGroup);
@@ -461,35 +514,56 @@ export class RhythmEngine {
       this.strikePadTrimMats.push(trimMat);
     }
 
-    // Flanking Arcade Equalizer Columns (solid neon gold/orange vector pillars)
+    // Flanking Arcade Equalizer Columns batched into 1 single InstancedMesh draw call
     const eqGeo = this.trackEnvGeo(new THREE.BoxGeometry(0.36, 1.0, 0.56));
     eqGeo.translate(0, 0.5, 0);
     const plinthGeo = this.trackEnvGeo(new THREE.BoxGeometry(0.56, 0.26, 0.78));
     const plinthMat = this.trackEnvMat(new THREE.MeshBasicMaterial({ color: 0x1b1738 }));
     this.eqBarMat = this.trackEnvMat(new THREE.MeshBasicMaterial({ color: 0xff9f1c }));
 
-    const eqCount = this.lowPower ? 9 : 12;
-    const eqStep = this.lowPower ? 4.1 : 3.1;
+    const eqCount = this.lowPower ? 7 : 11;
+    const eqStep = this.lowPower ? 5.2 : 3.4;
+    const totalEq = eqCount * 2;
+    this.eqMesh = new THREE.InstancedMesh(eqGeo, this.eqBarMat, totalEq);
+    this.eqMesh.frustumCulled = false;
+    this.eqPositionsX = new Float32Array(totalEq);
+    this.eqPositionsZ = new Float32Array(totalEq);
+    this.eqScalesY = new Float32Array(totalEq);
+
+    const plinthMesh = new THREE.InstancedMesh(plinthGeo, plinthMat, totalEq);
+    plinthMesh.frustumCulled = false;
+
+    let idx = 0;
     for (let i = 0; i < eqCount; i++) {
-      const z = STRIKE_Z - 2.2 - i * eqStep;
+      const z = STRIKE_Z - 2.4 - i * eqStep;
       for (const side of [-1, 1]) {
         const x = side * (TRACK_WIDTH / 2 + 1.28);
+        const initScaleY = 0.6 + (i % 3) * 0.22;
+        this.eqPositionsX[idx] = x;
+        this.eqPositionsZ[idx] = z;
+        this.eqScalesY[idx] = initScaleY;
 
-        const plinth = new THREE.Mesh(plinthGeo, plinthMat);
-        plinth.position.set(x, -0.32, z);
-        this.scene.add(plinth);
+        _dummy.position.set(x, -0.32, z);
+        _dummy.rotation.set(0, 0, 0);
+        _dummy.scale.set(1, 1, 1);
+        _dummy.updateMatrix();
+        plinthMesh.setMatrixAt(idx, _dummy.matrix);
 
-        const bar = new THREE.Mesh(eqGeo, this.eqBarMat);
-        bar.position.set(x, -0.19, z);
-        bar.scale.y = 0.6 + (i % 3) * 0.25;
-        this.scene.add(bar);
-
-        if (side < 0) this.eqBarsLeft.push(bar);
-        else this.eqBarsRight.push(bar);
+        _dummy.position.set(x, -0.19, z);
+        _dummy.scale.set(1, initScaleY, 1);
+        _dummy.updateMatrix();
+        this.eqMesh.setMatrixAt(idx, _dummy.matrix);
+        idx++;
       }
     }
+    plinthMesh.instanceMatrix.needsUpdate = true;
+    this.freezeStaticObject(plinthMesh);
+    this.scene.add(plinthMesh);
 
-    // Overhead Flat-Vector Arcade Portal Arches stretching down the highway
+    this.eqMesh.instanceMatrix.needsUpdate = true;
+    this.scene.add(this.eqMesh);
+
+    // Overhead Flat-Vector Arcade Portal Arches (static frozen transforms)
     const postGeo = this.trackEnvGeo(new THREE.BoxGeometry(0.24, 5.4, 0.24));
     const beamGeo = this.trackEnvGeo(new THREE.BoxGeometry(TRACK_WIDTH + 3.4, 0.28, 0.28));
     const beamTrimGeo = this.trackEnvGeo(new THREE.BoxGeometry(TRACK_WIDTH + 3.1, 0.12, 0.34));
@@ -504,14 +578,22 @@ export class RhythmEngine {
 
       const leftPost = new THREE.Mesh(postGeo, archBodyMat);
       leftPost.position.set(-(TRACK_WIDTH / 2 + 1.58), 2.5, 0);
+      this.freezeStaticObject(leftPost);
+
       const rightPost = new THREE.Mesh(postGeo, archBodyMat);
       rightPost.position.set(TRACK_WIDTH / 2 + 1.58, 2.5, 0);
+      this.freezeStaticObject(rightPost);
+
       const topBeam = new THREE.Mesh(beamGeo, archBodyMat);
       topBeam.position.set(0, 5.2, 0);
+      this.freezeStaticObject(topBeam);
+
       const trim = new THREE.Mesh(beamTrimGeo, this.archTrimMat);
       trim.position.set(0, 5.02, 0);
+      this.freezeStaticObject(trim);
 
       arch.add(leftPost, rightPost, topBeam, trim);
+      this.freezeStaticObject(arch);
       this.scene.add(arch);
     }
   }
@@ -594,6 +676,7 @@ export class RhythmEngine {
   public setShowcaseLevel(levelId: number): void {
     const level = getLevelById(levelId);
     this.currentLevel = level;
+    this.cachedLanePrompts = this.createStaticLanePrompts(level);
     this.levelAccentColor.setHex(level.accentInt);
 
     if (this.showcaseItemMesh) {
@@ -635,10 +718,25 @@ export class RhythmEngine {
     const track = trackId ? getMusicTrackById(trackId) : this.currentTrack;
     this.currentLevel = level;
     this.currentTrack = track;
+    this.cachedLanePrompts = this.createStaticLanePrompts(level);
     this.levelAccentColor.setHex(level.accentInt);
     this.clearActiveTiles();
 
     this.notes = generateLevelChart(level, track);
+
+    // Precompute smooth arrival timestamps strictly from the level's optimal arcade pace
+    // (100% decoupled from the selected music track's BPM and AudioContext buffer quanta)
+    const levelStepSec = 60 / level.bpm;
+    this.noteTimesSec = new Float64Array(this.notes.length);
+    for (let i = 0; i < this.notes.length; i++) {
+      this.noteTimesSec[i] = LEAD_IN_SEC + (this.notes[i].beat - LEAD_IN_BEATS) * levelStepSec;
+    }
+    const lastNoteSec =
+      this.notes.length > 0 ? this.noteTimesSec[this.notes.length - 1] : LEAD_IN_SEC + 30;
+    this.endTimeSec = lastNoteSec + 1.65;
+    this.nextSpawnIdx = 0;
+    this.nextMissIdx = 0;
+
     this.score = 0;
     this.combo = 0;
     this.maxCombo = 0;
@@ -658,10 +756,12 @@ export class RhythmEngine {
     this.missStreak = 0;
     this.wasTempoBelow30 = false;
     this.serviceCallout = null;
-    this.lastBeatInt = -1;
-    this.currentBeat = 0;
-    this.cameraShake = 0;
-    this.hitstopTimer = 0;
+    this.simTimeSec = 0;
+    this.pulsePhase = 0;
+    this.hitFlashPulse = 0;
+    this.playCameraSettled = false;
+    this.prevSmoothDt = 0;
+    this.lastEmittedProgressPct = 0;
     this.perfFrameCount = 0;
     this.perfFrameTimeAcc = 0;
     this.perfHeadroomStreak = 0;
@@ -686,6 +786,7 @@ export class RhythmEngine {
   public resumeGame(): void {
     if (this.phase !== 'paused') return;
     this.phase = 'playing';
+    this.prevSmoothDt = 0;
     this.audio.resume();
     this.emitHud(true);
   }
@@ -694,6 +795,7 @@ export class RhythmEngine {
     this.audio.stop();
     this.clearActiveTiles();
     this.phase = 'title';
+    this.playCameraSettled = false;
     this.showcaseGroup.visible = true;
     this.setShowcaseLevel(levelId ?? this.currentLevel.id);
     this.emitHud(true);
@@ -706,26 +808,27 @@ export class RhythmEngine {
   }
 
   /**
-   * Player presses a lane (via D/F/J/K, 1/2/3/4, Top Symbol Bar click, or 3D lane tap).
+   * Player presses a lane (via D/F/J/K, 1/2/3/4, or direct 3D lane tap).
    */
   public triggerLane(lane: 0 | 1 | 2 | 3): void {
     if (this.phase !== 'playing') return;
 
     this.lanePressSpring[lane] = 1.0;
 
-    const secPerBeat = 60 / this.currentTrack.bpm;
     let bestNote: NoteEvent | null = null;
     let bestAbsSec = Infinity;
 
-    for (let i = 0; i < this.notes.length; i++) {
+    for (let i = this.nextMissIdx; i < this.notes.length; i++) {
       const n = this.notes[i];
-      if (n.hitState !== 'pending' || n.lane !== lane) continue;
-      const diffSec = Math.abs((n.beat - this.currentBeat) * secPerBeat);
-      if (diffSec < bestAbsSec) {
-        bestAbsSec = diffSec;
+      if (n.hitState !== 'pending') continue;
+      const deltaSec = this.noteTimesSec[i] - this.simTimeSec;
+      if (deltaSec > GOOD_SEC + 0.1) break;
+      if (n.lane !== lane) continue;
+      const absSec = Math.abs(deltaSec);
+      if (absSec < bestAbsSec) {
+        bestAbsSec = absSec;
         bestNote = n;
       }
-      if ((n.beat - this.currentBeat) * secPerBeat > GOOD_SEC + 0.1) break;
     }
 
     if (bestNote && bestAbsSec <= GOOD_SEC) {
@@ -749,7 +852,7 @@ export class RhythmEngine {
       }
 
       bestNote.hitState = 'hit';
-      bestNote.hitTime = this.currentBeat;
+      bestNote.hitTime = this.simTimeSec;
 
       this.combo += 1;
       if (this.combo > this.maxCombo) this.maxCombo = this.combo;
@@ -791,26 +894,25 @@ export class RhythmEngine {
       this.laneFlashSeq[lane] += 1;
       this.laneFlashTimer[lane] = 0.28;
 
-      // Crisp arcade visual & audio feedback
+      // Crisp arcade visual & audio feedback (zero hitstop stutter!)
       const itemDef = ITEMS[bestNote.item];
       const burstColor = bestNote.isUnique ? 0xffd166 : itemDef.accentInt;
       this.spawnShockwave(LANE_X[lane], burstColor, bestNote.isUnique ? 1.3 : 1.0);
       const particleCount = this.lowPower
         ? bestNote.isUnique
-          ? 12
+          ? 9
           : judgement === 'perfect'
-            ? 8
-            : 5
+            ? 6
+            : 4
         : bestNote.isUnique
-          ? 20
+          ? 18
           : judgement === 'perfect'
-            ? 14
-            : 9;
+            ? 12
+            : 8;
       this.spawnParticleBurst(LANE_X[lane], 0.55, STRIKE_Z, burstColor, particleCount);
 
-      if (bestNote.isUnique && judgement === 'perfect') {
-        this.hitstopTimer = 0.032;
-        this.beatPulse = Math.min(1.2, this.beatPulse + 0.45);
+      if (judgement === 'perfect') {
+        this.hitFlashPulse = Math.min(1.0, this.hitFlashPulse + (bestNote.isUnique ? 0.65 : 0.35));
       }
 
       const visual = this.activeVisuals.get(bestNote.id);
@@ -872,7 +974,6 @@ export class RhythmEngine {
     this.laneFlashSeq[lane] += 1;
     this.laneFlashTimer[lane] = 0.3;
 
-    this.cameraShake = Math.min(0.45, this.cameraShake + 0.22);
     this.audio.playMiss();
 
     if (this.tempoIntegrity <= 0) {
@@ -901,6 +1002,7 @@ export class RhythmEngine {
         sw.mesh.scale.setScalar(0.65 * scaleMult);
         sw.mesh.visible = true;
         sw.mat.color.setHex(colorHex);
+        this.activeShockwaveCount += 1;
         return;
       }
     }
@@ -913,7 +1015,7 @@ export class RhythmEngine {
       if (!p.active) {
         p.active = true;
         p.age = 0;
-        p.maxAge = 0.36 + Math.random() * 0.28;
+        p.maxAge = 0.34 + Math.random() * 0.24;
         p.pos.set(x + (Math.random() - 0.5) * 0.6, y + Math.random() * 0.3, z + (Math.random() - 0.5) * 0.4);
         const angle = Math.random() * Math.PI * 2;
         const speed = 1.8 + Math.random() * 3.8;
@@ -922,6 +1024,7 @@ export class RhythmEngine {
         p.rotSpeed = (Math.random() - 0.5) * 12;
         p.rot = Math.random() * Math.PI;
         p.color.setHex(spawned % 3 === 0 ? 0xffffff : colorHex);
+        this.activeParticleCount += 1;
         spawned++;
       }
     }
@@ -930,22 +1033,25 @@ export class RhythmEngine {
   private buildFreshTileVisual(itemType: ItemType): ActiveTileVisual {
     const group = new THREE.Group();
 
-    // Solid dark outline frame around coaster
+    // Static coaster sub-meshes have frozen local matrices (only parent `group` updates per frame)
     const outlineMesh = new THREE.Mesh(this.geoTileOutline, this.matTileOutline);
     outlineMesh.position.y = 0.06;
+    this.freezeStaticObject(outlineMesh);
     group.add(outlineMesh);
 
     const itemDef = ITEMS[itemType];
     const rimMat = new THREE.MeshBasicMaterial({ color: itemDef.accentInt });
     const rimMesh = new THREE.Mesh(this.geoTileRim, rimMat);
     rimMesh.position.y = 0.075;
+    this.freezeStaticObject(rimMesh);
     group.add(rimMesh);
 
     const trayMesh = new THREE.Mesh(this.geoTileBase, this.matTileBody);
     trayMesh.position.y = 0.09;
+    this.freezeStaticObject(trayMesh);
     group.add(trayMesh);
 
-    // Flat-vector 3D tableware icon seated cleanly on top of the arcade tile (zero shadows!)
+    // Single-draw-call merged flat-vector 3D tableware icon
     const itemGroup = this.modelLib.createItemMesh(itemType);
     const baseItemScale = itemGroup.scale.x;
     itemGroup.position.y = 0.19;
@@ -956,6 +1062,7 @@ export class RhythmEngine {
 
     return {
       note: null as unknown as NoteEvent,
+      noteTimeSec: 0,
       itemType,
       baseItemScale,
       baseAccentHex: itemDef.accentInt,
@@ -969,12 +1076,16 @@ export class RhythmEngine {
   }
 
   private prewarmTilePool(): void {
+    // Pre-allocate 5 pooled tiles per item type (50 total) so ZERO allocations occur mid-song
+    const perType = 5;
     for (const itemType of ALL_ITEM_TYPES) {
-      const vis = this.buildFreshTileVisual(itemType);
-      vis.group.visible = true;
-      const bucket = this.tilePool.get(itemType);
-      if (bucket) bucket.push(vis);
-      else this.tilePool.set(itemType, [vis]);
+      const bucket: ActiveTileVisual[] = [];
+      for (let c = 0; c < perType; c++) {
+        const vis = this.buildFreshTileVisual(itemType);
+        vis.group.visible = c === 0;
+        bucket.push(vis);
+      }
+      this.tilePool.set(itemType, bucket);
     }
   }
 
@@ -986,13 +1097,14 @@ export class RhythmEngine {
     });
   }
 
-  private createTileVisual(note: NoteEvent): ActiveTileVisual {
+  private createTileVisual(note: NoteEvent, noteTimeSec: number): ActiveTileVisual {
     const bucket = this.tilePool.get(note.item);
     const vis = bucket && bucket.length > 0 ? bucket.pop()! : this.buildFreshTileVisual(note.item);
 
     const itemDef = ITEMS[note.item];
     const accentHex = note.isUnique ? 0xffd166 : itemDef.accentInt;
     vis.note = note;
+    vis.noteTimeSec = noteTimeSec;
     vis.baseAccentHex = accentHex;
     vis.hitAnim = 0;
     vis.missedAnim = 0;
@@ -1087,15 +1199,17 @@ export class RhythmEngine {
     const w = this.container.clientWidth || window.innerWidth;
     const h = Math.max(1, this.container.clientHeight || window.innerHeight);
     this.updateResponsiveCamera(w, h);
+    this.playCameraSettled = false;
     this.renderer.setSize(w, h);
   }
 
-  private updateSimulation(dt: number, nowMs: number): void {
-    this.beatPulse = Math.max(0, this.beatPulse - dt * 3.4);
-    this.cameraShake = Math.max(0, this.cameraShake - dt * 2.2);
+  private updateSimulation(dt: number): void {
+    this.hitFlashPulse = Math.max(0, this.hitFlashPulse - dt * 4.0);
 
     for (let i = 0; i < LANE_COUNT; i++) {
-      this.lanePressSpring[i] = Math.max(0, this.lanePressSpring[i] - dt * 6.5);
+      if (this.lanePressSpring[i] > 0) {
+        this.lanePressSpring[i] = Math.max(0, this.lanePressSpring[i] - dt * 7.0);
+      }
       if (this.laneFlashTimer[i] > 0) {
         this.laneFlashTimer[i] = Math.max(0, this.laneFlashTimer[i] - dt);
         if (this.laneFlashTimer[i] === 0) {
@@ -1121,39 +1235,43 @@ export class RhythmEngine {
         this.showcaseItemMesh.position.y = 0.08 + Math.sin(this.elapsedIdle * 2.2) * 0.06;
       }
 
-      this.updateBeatVisuals(this.elapsedIdle * 1.6, 0.25 + 0.15 * Math.sin(this.elapsedIdle * 2.2), dt);
+      this.updateHighwayAndEqualizer(this.elapsedIdle * 0.45, 0.22 + 0.14 * Math.sin(this.elapsedIdle * 2.4), dt);
       this.updateParticlesAndShockwaves(dt);
       return;
     }
 
-    const playCamY = this.playCamBaseY - this.beatPulse * 0.12;
-    const playCamZ = this.playCamBaseZ - this.beatPulse * 0.16;
-    const shakeX = this.cameraShake > 0 ? (Math.random() - 0.5) * this.cameraShake * 0.42 : 0;
-    const shakeY = this.cameraShake > 0 ? (Math.random() - 0.5) * this.cameraShake * 0.28 : 0;
+    // Rock-steady gameplay camera: glides smoothly in from Title, then locks with ZERO jitter or bobbing
+    if (!this.playCameraSettled) {
+      this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, 0, 12, dt);
+      this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.playCamBaseY, 12, dt);
+      this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.playCamBaseZ, 12, dt);
+      this.camera.lookAt(0, this.playLookY, this.playLookZ);
 
-    this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, shakeX, 12, dt);
-    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, playCamY + shakeY, 10, dt);
-    this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, playCamZ, 10, dt);
-    this.camera.lookAt(0, this.playLookY, this.playLookZ);
+      if (
+        Math.abs(this.camera.position.x) < 0.002 &&
+        Math.abs(this.camera.position.y - this.playCamBaseY) < 0.002 &&
+        Math.abs(this.camera.position.z - this.playCamBaseZ) < 0.002
+      ) {
+        this.camera.position.set(0, this.playCamBaseY, this.playCamBaseZ);
+        this.camera.lookAt(0, this.playLookY, this.playLookZ);
+        this.playCameraSettled = true;
+      }
+    }
 
     if (this.phase === 'playing') {
       this.audio.update();
-      this.currentBeat = this.audio.getCurrentBeat();
 
-      const beatFloor = Math.floor(this.currentBeat);
-      if (beatFloor > this.lastBeatInt && beatFloor >= 0) {
-        this.lastBeatInt = beatFloor;
-        this.beatPulse = Math.min(1.0, 0.78 + Math.min(this.combo, 30) * 0.008);
-      }
+      // Advance pure VSync monotonic clock (100% decoupled from BPM & AudioContext quanta)
+      this.simTimeSec += dt;
+      this.pulsePhase += dt * 3.2;
 
-      const simDt = this.hitstopTimer > 0 ? dt * 0.25 : dt;
-      this.hitstopTimer = Math.max(0, this.hitstopTimer - dt);
+      const ambientWave = 0.22 + 0.16 * Math.sin(this.pulsePhase * 2.0);
+      const visualPulse = Math.min(1, ambientWave + this.hitFlashPulse * 0.78);
 
-      this.updateNotesAndTiles(simDt);
-      this.updateBeatVisuals(this.currentBeat, this.beatPulse, dt);
+      this.updateNotesAndTiles(dt);
+      this.updateHighwayAndEqualizer(this.simTimeSec, visualPulse, dt);
 
-      const endBeat = LEAD_IN_BEATS + this.currentLevel.durationBeats + 3.2;
-      if (this.currentBeat >= endBeat && this.phase === 'playing') {
+      if (this.simTimeSec >= this.endTimeSec && this.phase === 'playing') {
         this.phase = 'victory';
         this.audio.stop();
         this.audio.playVictoryFanfare();
@@ -1163,126 +1281,147 @@ export class RhythmEngine {
         return;
       }
 
-      const hudIntervalMs = this.isMobileLite ? 50 : 33;
-      if (nowMs - this.lastHudEmitMs >= hudIntervalMs) {
+      // Only emit React HUD update when integer progress % changes (eliminates ~90% of wasted React renders!)
+      const progressPct = Math.round(THREE.MathUtils.clamp(this.simTimeSec / this.endTimeSec, 0, 1) * 100);
+      if (progressPct !== this.lastEmittedProgressPct) {
+        this.lastEmittedProgressPct = progressPct;
         this.emitHud(false);
-        this.lastHudEmitMs = nowMs;
       }
     } else {
-      this.updateBeatVisuals(this.currentBeat, this.beatPulse * 0.4, dt);
+      this.updateHighwayAndEqualizer(this.simTimeSec, this.hitFlashPulse * 0.35, dt);
     }
 
     this.updateParticlesAndShockwaves(dt);
   }
 
   private updateNotesAndTiles(dt: number): void {
-    const secPerBeat = 60 / this.currentTrack.bpm;
-    const spawnLookaheadBeats = (STRIKE_Z - SPAWN_Z) / UNITS_PER_BEAT;
+    const spawnLookaheadSec = (STRIKE_Z - SPAWN_Z) / SCROLL_UNITS_PER_SEC;
+    const totalNotes = this.notes.length;
 
-    for (let i = 0; i < this.notes.length; i++) {
-      const note = this.notes[i];
-      const deltaBeats = note.beat - this.currentBeat;
+    // O(1) amortized spawning cursor (never rescans already-spawned notes)
+    while (this.nextSpawnIdx < totalNotes) {
+      const noteTime = this.noteTimesSec[this.nextSpawnIdx];
+      if (noteTime - this.simTimeSec > spawnLookaheadSec) break;
+      const note = this.notes[this.nextSpawnIdx];
+      if (note.hitState === 'pending' && !this.activeVisuals.has(note.id)) {
+        this.activeVisuals.set(note.id, this.createTileVisual(note, noteTime));
+      }
+      this.nextSpawnIdx += 1;
+    }
 
-      if (note.hitState === 'pending') {
-        if (deltaBeats <= spawnLookaheadBeats && deltaBeats > -2.5) {
-          if (!this.activeVisuals.has(note.id)) {
-            this.activeVisuals.set(note.id, this.createTileVisual(note));
-          }
-        }
-
-        if (-deltaBeats * secPerBeat > MISS_PASS_SEC) {
-          note.hitState = 'missed';
-          const vis = this.activeVisuals.get(note.id);
-          if (vis) vis.missedAnim = 0.001;
-          this.registerMiss(note.lane, true);
-          if (this.phase !== 'playing') return;
-        }
+    // O(1) amortized miss-detection cursor
+    while (this.nextMissIdx < totalNotes) {
+      const note = this.notes[this.nextMissIdx];
+      if (note.hitState !== 'pending') {
+        this.nextMissIdx += 1;
+        continue;
+      }
+      if (this.simTimeSec - this.noteTimesSec[this.nextMissIdx] > MISS_PASS_SEC) {
+        note.hitState = 'missed';
+        const vis = this.activeVisuals.get(note.id);
+        if (vis) vis.missedAnim = 0.001;
+        this.nextMissIdx += 1;
+        this.registerMiss(note.lane, true);
+        if (this.phase !== 'playing') return;
+      } else {
+        break;
       }
     }
 
-    const toRemove: [number, ActiveTileVisual][] = [];
+    this.toRemoveIds.length = 0;
+    this.toRemoveVisuals.length = 0;
+
     this.activeVisuals.forEach((vis, id) => {
       if (vis.hitAnim > 0) {
-        vis.hitAnim += dt * 5.2;
+        vis.hitAnim += dt * 5.4;
         const t = Math.min(1, vis.hitAnim);
-        // Snappy opaque arcade pop-and-shrink vanish (zero alpha fade!)
         const popScale = t < 0.35 ? 1 + t * 1.15 : Math.max(0.01, (1 - t) * 2.15);
         vis.group.scale.setScalar(popScale);
         vis.group.position.y = t * 1.45;
-        vis.itemGroup.rotation.y += dt * 16;
+        vis.itemGroup.rotation.y += dt * 15;
         vis.rimMat.color.setHex(0xffffff);
         if (t >= 1) {
-          toRemove.push([id, vis]);
+          this.toRemoveIds.push(id);
+          this.toRemoveVisuals.push(vis);
         }
         return;
       }
 
       if (vis.missedAnim > 0) {
-        vis.missedAnim += dt * 4.2;
+        vis.missedAnim += dt * 4.4;
         const t = Math.min(1, vis.missedAnim);
-        vis.group.position.z = STRIKE_Z + (this.currentBeat - vis.note.beat) * UNITS_PER_BEAT;
+        vis.group.position.z = STRIKE_Z + (this.simTimeSec - vis.noteTimeSec) * SCROLL_UNITS_PER_SEC;
         vis.group.position.y = -t * 0.9;
         vis.group.scale.setScalar(Math.max(0.01, 1 - t));
         vis.rimMat.color.setHex(0xff3b6b);
         if (t >= 1) {
-          toRemove.push([id, vis]);
+          this.toRemoveIds.push(id);
+          this.toRemoveVisuals.push(vis);
         }
         return;
       }
 
-      const deltaBeats = vis.note.beat - this.currentBeat;
-      const z = STRIKE_Z - deltaBeats * UNITS_PER_BEAT;
+      // Pure constant-velocity glide (zero BPM coupling, zero vertical bounce jitter!)
+      const deltaSec = vis.noteTimeSec - this.simTimeSec;
+      const z = STRIKE_Z - deltaSec * SCROLL_UNITS_PER_SEC;
       vis.group.position.z = z;
 
-      // Crisp opaque pop-in scale at far horizon (replaces fog fade)
+      // Smooth opaque pop-in at far horizon
       const horizonDist = z - SPAWN_Z;
-      const entryScale = THREE.MathUtils.clamp(horizonDist / 3.5, 0.05, 1);
+      const entryScale = horizonDist < 3.6 ? THREE.MathUtils.clamp(horizonDist / 3.6, 0.05, 1) : 1;
       vis.group.scale.setScalar(entryScale);
 
-      // Beat-synchronized arcade bounce & spin
-      const beatFrac = ((this.currentBeat % 1) + 1) % 1;
-      const bounce = Math.max(0, Math.sin(beatFrac * Math.PI)) * 0.1;
-      vis.itemGroup.position.y = 0.19 + bounce;
-      vis.itemGroup.rotation.y = vis.note.isUnique
-        ? this.currentBeat * 1.6 + vis.note.lane * 0.5
-        : Math.sin(this.currentBeat * 1.2 + vis.note.id) * 0.2;
+      // Unique 2x items spin smoothly with continuous time; standard items stay rock-steady & readable
+      if (vis.note.isUnique) {
+        vis.itemGroup.rotation.y = this.simTimeSec * 2.2 + vis.note.lane * 0.5;
+      }
 
-      // Brighten tile rim toward pure white as it enters the strike zone
-      const proximity = THREE.MathUtils.clamp(1 - Math.abs(deltaBeats) * 0.6, 0, 1);
-      _baseColor.setHex(vis.baseAccentHex);
-      _targetColor.setHex(0xffffff);
-      vis.rimMat.color.copy(_baseColor).lerp(_targetColor, proximity * 0.55);
+      // Highlight tile rim smoothly as it approaches the strike bar
+      const absDeltaSec = Math.abs(deltaSec);
+      if (absDeltaSec < 0.65) {
+        const proximity = 1 - absDeltaSec / 0.65;
+        _baseColor.setHex(vis.baseAccentHex);
+        _targetColor.setHex(0xffffff);
+        vis.rimMat.color.copy(_baseColor).lerp(_targetColor, proximity * 0.58);
+      } else {
+        vis.rimMat.color.setHex(vis.baseAccentHex);
+      }
     });
 
-    for (const [id, vis] of toRemove) {
-      this.removeTileVisual(id, vis);
+    for (let i = 0; i < this.toRemoveIds.length; i++) {
+      this.removeTileVisual(this.toRemoveIds[i], this.toRemoveVisuals[i]);
     }
   }
 
-  private updateBeatVisuals(beatVal: number, pulse: number, dt: number): void {
-    // Scroll track beat divider bars smoothly with beat
-    const frac = ((beatVal % 1) + 1) % 1;
-    for (let i = 0; i < this.beatLines.length; i++) {
-      this.beatLines[i].position.z = STRIKE_Z + frac * UNITS_PER_BEAT - i * UNITS_PER_BEAT;
+  private updateHighwayAndEqualizer(timeSec: number, pulse: number, dt: number): void {
+    // Scroll highway bars at the EXACT same constant world velocity as tiles (1 single InstancedMesh draw call!)
+    const scrollOffset = ((timeSec * SCROLL_UNITS_PER_SEC) % HIGHWAY_BAR_SPACING + HIGHWAY_BAR_SPACING) % HIGHWAY_BAR_SPACING;
+    _dummy.rotation.set(0, 0, 0);
+    _dummy.scale.set(1, 1, 1);
+    for (let i = 0; i < HIGHWAY_BAR_COUNT; i++) {
+      _dummy.position.set(0, 0.015, STRIKE_Z + scrollOffset - i * HIGHWAY_BAR_SPACING);
+      _dummy.updateMatrix();
+      this.beatLinesMesh.setMatrixAt(i, _dummy.matrix);
     }
+    this.beatLinesMesh.instanceMatrix.needsUpdate = true;
 
     const comboBoost = Math.min(this.combo, 30) / 30;
     const pulseClamped = THREE.MathUtils.clamp(pulse, 0, 1);
 
-    // Pulse beat lines, strike bar & portal arches using pure flat color shifts (zero lighting!)
+    // Subtle flat color energy shifts on highway bars, strike bar & portal arches
     _baseColor.setHex(0x302b5e);
-    _targetColor.setHex(0x6359b8);
-    this.beatLineMat.color.copy(_baseColor).lerp(_targetColor, pulseClamped * 0.75);
+    _targetColor.setHex(0x5b52ad);
+    this.beatLineMat.color.copy(_baseColor).lerp(_targetColor, pulseClamped * 0.65);
 
     _baseColor.setHex(0xffd166);
     _targetColor.setHex(0xffffff);
-    this.strikeBarMat.color.copy(_baseColor).lerp(_targetColor, pulseClamped * 0.65);
+    this.strikeBarMat.color.copy(_baseColor).lerp(_targetColor, pulseClamped * 0.55);
 
     _baseColor.copy(this.levelAccentColor);
     _targetColor.setHex(0xffffff);
-    this.archTrimMat.color.copy(_baseColor).lerp(_targetColor, pulseClamped * 0.45);
+    this.archTrimMat.color.copy(_baseColor).lerp(_targetColor, pulseClamped * 0.4);
 
-    // Update 4 strike pads depression & crisp solid hit color flashes
+    // Update 4 strike pads press depression & crisp solid hit color flashes
     for (let lane = 0; lane < LANE_COUNT; lane++) {
       const pad = this.strikePads[lane];
       const innerMat = this.strikePadMats[lane];
@@ -1306,45 +1445,58 @@ export class RhythmEngine {
         const press = this.lanePressSpring[lane];
         _baseColor.setHex(0x221d42);
         _targetColor.setHex(0x473d85);
-        innerMat.color.copy(_baseColor).lerp(_targetColor, Math.min(1, pulseClamped * 0.35 + press * 0.75));
+        innerMat.color.copy(_baseColor).lerp(_targetColor, Math.min(1, pulseClamped * 0.3 + press * 0.75));
         _baseColor.setHex(lane === 1 || lane === 2 ? 0xffd166 : 0x38bdf8);
         _targetColor.setHex(0xffffff);
-        trimMat.color.copy(_baseColor).lerp(_targetColor, Math.min(1, pulseClamped * 0.3 + press * 0.6));
+        trimMat.color.copy(_baseColor).lerp(_targetColor, Math.min(1, pulseClamped * 0.25 + press * 0.6));
       }
     }
 
-    // Equalizer side columns pulse color & height on the beat
+    // Equalizer side columns batched into 1 single InstancedMesh (smooth continuous wave)
     _baseColor.setHex(0xff9f1c);
     _targetColor.setHex(0xff2a85);
-    this.eqBarMat.color.copy(_baseColor).lerp(_targetColor, Math.min(1, pulseClamped * 0.6 + comboBoost * 0.4));
+    this.eqBarMat.color.copy(_baseColor).lerp(_targetColor, Math.min(1, pulseClamped * 0.55 + comboBoost * 0.4));
 
-    for (let i = 0; i < this.eqBarsLeft.length; i++) {
-      const wave = 0.5 + 0.5 * Math.sin(beatVal * Math.PI * 1.0 - i * 0.55);
-      const targetScaleY = 0.35 + (wave * 0.95 + pulse * 1.55) * (1 + comboBoost * 0.45);
-      const lBar = this.eqBarsLeft[i];
-      const rBar = this.eqBarsRight[i];
-      lBar.scale.y = THREE.MathUtils.damp(lBar.scale.y, targetScaleY, 15, dt);
-      rBar.scale.y = THREE.MathUtils.damp(rBar.scale.y, targetScaleY, 15, dt);
+    const totalEq = this.eqPositionsX.length;
+    const waveBase = timeSec * 5.2;
+    _dummy.rotation.set(0, 0, 0);
+    for (let idx = 0; idx < totalEq; idx++) {
+      const pairIdx = idx >> 1;
+      const wave = 0.5 + 0.5 * Math.sin(waveBase - pairIdx * 0.65);
+      const targetScaleY = 0.38 + (wave * 0.9 + pulseClamped * 1.15) * (1 + comboBoost * 0.4);
+      const nextY = THREE.MathUtils.damp(this.eqScalesY[idx], targetScaleY, 12, dt);
+      this.eqScalesY[idx] = nextY;
+
+      _dummy.position.set(this.eqPositionsX[idx], -0.19, this.eqPositionsZ[idx]);
+      _dummy.scale.set(1, nextY, 1);
+      _dummy.updateMatrix();
+      this.eqMesh.setMatrixAt(idx, _dummy.matrix);
     }
+    this.eqMesh.instanceMatrix.needsUpdate = true;
   }
 
   private updateParticlesAndShockwaves(dt: number): void {
-    // Opaque shockwave rings expand and snap off cleanly (zero opacity/transparency)
-    for (let i = 0; i < this.shockwaves.length; i++) {
-      const sw = this.shockwaves[i];
-      if (!sw.active) continue;
-      sw.age += dt;
-      const t = sw.age / sw.maxAge;
-      if (t >= 1) {
-        sw.active = false;
-        sw.mesh.visible = false;
-        continue;
+    // O(1) early-out when zero shockwaves are active
+    if (this.activeShockwaveCount > 0) {
+      for (let i = 0; i < this.shockwaves.length; i++) {
+        const sw = this.shockwaves[i];
+        if (!sw.active) continue;
+        sw.age += dt;
+        const t = sw.age / sw.maxAge;
+        if (t >= 1) {
+          sw.active = false;
+          sw.mesh.visible = false;
+          this.activeShockwaveCount = Math.max(0, this.activeShockwaveCount - 1);
+          continue;
+        }
+        const easeOut = 1 - Math.pow(1 - t, 3);
+        sw.mesh.scale.setScalar(0.65 + easeOut * 1.85);
       }
-      const easeOut = 1 - Math.pow(1 - t, 3);
-      sw.mesh.scale.setScalar(0.65 + easeOut * 1.85);
     }
 
-    // Opaque arcade diamond shards scale down smoothly to 0
+    // O(1) early-out when zero particles are active (avoids GPU buffer uploads when idle!)
+    if (this.activeParticleCount === 0) return;
+
     let dirty = false;
     for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i];
@@ -1353,6 +1505,7 @@ export class RhythmEngine {
       p.age += dt;
       if (p.age >= p.maxAge) {
         p.active = false;
+        this.activeParticleCount = Math.max(0, this.activeParticleCount - 1);
         _dummy.position.set(0, -100, 0);
         _dummy.scale.setScalar(0);
         _dummy.updateMatrix();
@@ -1379,65 +1532,14 @@ export class RhythmEngine {
   }
 
   private buildHudSnapshot(): HudSnapshot {
-    const secPerBeat = 60 / this.currentTrack.bpm;
-
-    let nextRowBeat = Infinity;
-    const nearestPerLane: (NoteEvent | null)[] = [null, null, null, null];
-
-    for (let i = 0; i < this.notes.length; i++) {
-      const n = this.notes[i];
-      if (n.hitState !== 'pending') continue;
-      if (n.beat < nextRowBeat) nextRowBeat = n.beat;
-      if (!nearestPerLane[n.lane]) {
-        nearestPerLane[n.lane] = n;
-      }
-      if (nearestPerLane[0] && nearestPerLane[1] && nearestPerLane[2] && nearestPerLane[3]) {
-        break;
-      }
-    }
-
-    const prompts: LanePrompt[] = [];
-    for (let lane = 0; lane < LANE_COUNT; lane++) {
-      const n = nearestPerLane[lane];
-      if (n) {
-        const beatsAway = n.beat - this.currentBeat;
-        const secAway = Math.abs(beatsAway * secPerBeat);
-        const proximity = THREE.MathUtils.clamp(1 - beatsAway / 4.0, 0, 1.15);
-        prompts.push({
-          lane: lane as 0 | 1 | 2 | 3,
-          item: n.item,
-          isUnique: n.isUnique,
-          proximity,
-          inHitWindow: secAway <= GOOD_SEC,
-          isNextRow: Math.abs(n.beat - nextRowBeat) < 0.05 && beatsAway <= 4.5,
-          hasNote: true,
-          flashKind: this.laneFlashKind[lane],
-          flashSeq: this.laneFlashSeq[lane],
-        });
-      } else {
-        const fallbackItem = this.currentLevel.laneItems[lane];
-        prompts.push({
-          lane: lane as 0 | 1 | 2 | 3,
-          item: fallbackItem,
-          isUnique: fallbackItem === this.currentLevel.uniqueItem,
-          proximity: 0,
-          inHitWindow: false,
-          isNextRow: false,
-          hasNote: false,
-          flashKind: this.laneFlashKind[lane],
-          flashSeq: this.laneFlashSeq[lane],
-        });
-      }
-    }
-
     const judged = this.stats.perfect + this.stats.great + this.stats.good + this.stats.miss;
     const weighted = this.stats.perfect * 1 + this.stats.great * 0.78 + this.stats.good * 0.45;
     const accuracy = judged > 0 ? Math.round((weighted / judged) * 100) : 100;
     const stars: 0 | 1 | 2 | 3 =
       this.phase === 'gameover' ? 0 : accuracy >= 90 ? 3 : accuracy >= 75 ? 2 : 1;
 
-    const totalBeats = LEAD_IN_BEATS + this.currentLevel.durationBeats + 2;
-    const progress = THREE.MathUtils.clamp(this.currentBeat / totalBeats, 0, 1);
+    const progress =
+      this.endTimeSec > 0 ? THREE.MathUtils.clamp(this.simTimeSec / this.endTimeSec, 0, 1) : 0;
 
     return {
       phase: this.phase,
@@ -1450,24 +1552,21 @@ export class RhythmEngine {
       tempoIntegrity: Math.round(this.tempoIntegrity),
       progress,
       bpm: this.currentTrack.bpm,
-      currentBeat: this.currentBeat,
-      beatPulse: this.beatPulse,
+      currentBeat: this.simTimeSec * (this.currentLevel.bpm / 60),
+      beatPulse: this.hitFlashPulse,
       lastJudgement: this.lastJudgement,
       lastJudgementIsUnique: this.lastJudgementIsUnique,
       lastJudgementPoints: this.lastJudgementPoints,
       judgementSeq: this.judgementSeq,
       serviceCallout: this.serviceCallout ? { ...this.serviceCallout } : null,
-      lanePrompts: prompts as [LanePrompt, LanePrompt, LanePrompt, LanePrompt],
+      lanePrompts: this.cachedLanePrompts,
       stats: { ...this.stats },
       accuracy,
       stars,
     };
   }
 
-  private emitHud(force: boolean): void {
-    if (force) {
-      this.lastHudEmitMs = performance.now();
-    }
+  private emitHud(_force: boolean): void {
     this.onHudUpdate(this.buildHudSnapshot());
   }
 
@@ -1517,23 +1616,23 @@ export class RhythmEngine {
     this.perfFrameCount += 1;
     this.perfFrameTimeAcc += rawDt;
 
-    if (this.perfFrameCount < 45) return;
+    if (this.perfFrameCount < 40) return;
 
     const avgMs = (this.perfFrameTimeAcc / this.perfFrameCount) * 1000;
     this.perfFrameCount = 0;
     this.perfFrameTimeAcc = 0;
 
-    if (avgMs > 21.5 && this.currentPixelRatio > 0.85) {
+    if (avgMs > 19.5 && this.currentPixelRatio > 0.75) {
       this.perfHeadroomStreak = 0;
-      this.currentPixelRatio = Math.max(0.85, Number((this.currentPixelRatio - 0.15).toFixed(2)));
+      this.currentPixelRatio = Math.max(0.75, Number((this.currentPixelRatio - 0.12).toFixed(2)));
       this.renderer.setPixelRatio(this.currentPixelRatio);
-    } else if (avgMs < 17.5 && this.currentPixelRatio < this.maxPixelRatio) {
+    } else if (avgMs < 15.5 && this.currentPixelRatio < this.maxPixelRatio) {
       this.perfHeadroomStreak += 1;
-      if (this.perfHeadroomStreak >= 3) {
+      if (this.perfHeadroomStreak >= 4) {
         this.perfHeadroomStreak = 0;
         this.currentPixelRatio = Math.min(
           this.maxPixelRatio,
-          Number((this.currentPixelRatio + 0.1).toFixed(2)),
+          Number((this.currentPixelRatio + 0.08).toFixed(2)),
         );
         this.renderer.setPixelRatio(this.currentPixelRatio);
       }
@@ -1542,15 +1641,22 @@ export class RhythmEngine {
     }
   }
 
-  private tick = (): void => {
+  private tick = (frameTimeMs?: number): void => {
     if (this.disposed) return;
-    const now = performance.now();
-    const rawDt = (now - this.lastTimeMs) / 1000;
-    this.lastTimeMs = now;
-    const dt = Math.min(Math.max(rawDt, 0.001), 0.05);
+    const now = typeof frameTimeMs === 'number' ? frameTimeMs : performance.now();
+    const rawDt = now > this.lastTimeMs ? (now - this.lastTimeMs) / 1000 : 1 / 60;
+    this.lastTimeMs = Math.max(this.lastTimeMs, now);
+
+    const clampedDt = Math.min(Math.max(rawDt, 0.001), 0.05);
+    // Sub-millisecond rAF jitter smoothing for glass-smooth visual frame pacing
+    const dt =
+      this.prevSmoothDt > 0 && Math.abs(clampedDt - this.prevSmoothDt) < this.prevSmoothDt * 0.35
+        ? this.prevSmoothDt * 0.25 + clampedDt * 0.75
+        : clampedDt;
+    this.prevSmoothDt = dt;
 
     this.updateAdaptiveResolution(rawDt);
-    this.updateSimulation(dt, now);
+    this.updateSimulation(dt);
     this.renderer.render(this.scene, this.camera);
     this.scheduleNextTick();
   };
