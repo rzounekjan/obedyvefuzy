@@ -42,7 +42,7 @@ export type MusicTrackId =
   | 'dubstep-blank'
   | 'dubstep-bensound'
   | 'dubstep-savage'
-  | 'dubstep-falling';
+  | 'dubstep-hellcat';
 
 export type SciFiSfxMode = 'laser' | 'plasma' | 'photon';
 
