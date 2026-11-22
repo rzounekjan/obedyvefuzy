@@ -8,7 +8,6 @@ import { GameHud } from './components/GameHud';
 import { GameModals } from './components/GameModals';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { TitleScreen } from './components/TitleScreen';
-import { TopSymbolBar } from './components/TopSymbolBar';
 import { ALT_LANE_KEYS, LANE_KEYS, LEVELS } from './game/levels';
 import { DEFAULT_MUSIC_TRACK_ID, getMusicTrackById, MUSIC_TRACKS } from './game/musicLibrary';
 import { RhythmEngine } from './game/RhythmEngine';
@@ -349,20 +348,14 @@ export default function App() {
         />
       )}
 
-      {/* Active Play Overlays: Top Symbol Bar + Low-Occlusion Perimeter HUD */}
+      {/* Active Play Overlays: Low-Occlusion Perimeter HUD */}
       {(hud.phase === 'playing' || hud.phase === 'paused') && (
-        <>
-          <TopSymbolBar
-            lanePrompts={hud.lanePrompts}
-            onTriggerLane={handleTriggerLane}
-          />
-          <GameHud
-            hud={hud}
-            muted={muted}
-            onToggleMute={handleToggleMute}
-            onPause={handlePause}
-          />
-        </>
+        <GameHud
+          hud={hud}
+          muted={muted}
+          onToggleMute={handleToggleMute}
+          onPause={handlePause}
+        />
       )}
 
       {/* Pause / Victory / Game Over Modals */}

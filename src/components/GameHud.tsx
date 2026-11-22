@@ -159,7 +159,7 @@ export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPa
       {judgeCfg && hud.judgementSeq > 0 && (
         <div
           key={hud.judgementSeq}
-          className="animate-judgement fixed top-[calc(max(8px,env(safe-area-inset-top))+136px)] md:top-[132px] left-1/2 flex flex-col items-center pointer-events-none"
+          className="animate-judgement fixed top-[calc(max(8px,env(safe-area-inset-top))+58px)] md:top-5 left-1/2 flex flex-col items-center pointer-events-none"
         >
           <span
             className="rounded-md border-2 border-[#090814] px-3 py-0.5 font-mono-tabular text-sm sm:text-base font-extrabold tracking-wider"

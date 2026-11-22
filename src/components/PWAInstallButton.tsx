@@ -23,7 +23,7 @@ export const PWAInstallButton: React.FC = () => {
         className="pointer-events-auto flex h-11 items-center gap-2 rounded-lg border-2 border-[#38bdf8] bg-[#141229] px-3.5 text-xs sm:text-sm font-bold text-[#f8fafc] hover:bg-[#1e1b3c] hover:border-[#ffd166] transition-colors cursor-pointer whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#ffd166]"
       >
         <Download className="w-4 h-4 text-[#38bdf8]" />
-        <span>Nainstalovat aplikaci</span>
+        <span>Instalovat</span>
       </button>
     );
   }
@@ -37,7 +37,7 @@ export const PWAInstallButton: React.FC = () => {
           className="pointer-events-auto flex h-11 items-center gap-2 rounded-lg border-2 border-[#38bdf8] bg-[#141229] px-3.5 text-xs sm:text-sm font-bold text-[#f8fafc] hover:bg-[#1e1b3c] hover:border-[#ffd166] transition-colors cursor-pointer whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#ffd166]"
         >
           <Download className="w-4 h-4 text-[#38bdf8]" />
-          <span>Nainstalovat na iOS</span>
+          <span>Instalovat</span>
         </button>
 
         {showIOSGuide && (

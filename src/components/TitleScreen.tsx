@@ -3,8 +3,9 @@ import { Disc3, Gauge, Music, Play, Square, Star, Utensils, Volume2, VolumeX } f
 import { ITEMS, LEVELS } from '../game/levels';
 import { getMusicTrackById, MUSIC_TRACKS } from '../game/musicLibrary';
 import type { MusicTrackId, ProgressMap } from '../game/types';
-import { ItemIcon, TitleEmblem } from './ItemIcons';
+import { ItemIcon } from './ItemIcons';
 import { PWAInstallButton } from './PWAInstallButton';
+import fuzedyNeonLogo from '../assets/images/fuzedy_neon_logo_1795359031763.jpg';
 
 interface TitleScreenProps {
   selectedLevelId: number;
@@ -49,9 +50,14 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
     <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between px-3.5 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))] sm:p-7">
       {/* Top Row: Solid Arcade Brand Lockup (left) + Install & Audio Controls (right) */}
       <div className="flex items-start justify-between gap-2.5 sm:gap-4">
-        <div className="pointer-events-auto max-w-md rounded-xl border-2 border-[#ffd166] bg-[#141229] px-3.5 py-2.5 sm:px-5 sm:py-3.5">
+        <div className="pointer-events-auto max-w-md rounded-xl border-2 border-[#ff4500] bg-[#000000] px-3 py-2 sm:px-4 sm:py-3">
           <div className="flex items-center gap-3 sm:gap-3.5">
-            <TitleEmblem className="w-9 h-9 sm:w-11 sm:h-11 shrink-0" />
+            <img
+              src={fuzedyNeonLogo}
+              alt="Logo FUZEDY"
+              referrerPolicy="no-referrer"
+              className="w-11 h-11 sm:w-14 sm:h-14 rounded-lg bg-[#000000] object-contain shrink-0"
+            />
             <div>
               <h1 className="font-display text-xl sm:text-3xl font-bold tracking-tight text-[#ffffff] leading-none">
                 FUZEDY
@@ -303,9 +309,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
         {/* Single flat control-hint line */}
         <p className="text-center text-[11px] sm:text-xs font-medium text-[#94a3b8] tracking-wide">
-          <span className="sm:hidden">Klepněte na dlaždici nebo na symboly nahoře v rytmu</span>
+          <span className="sm:hidden">Klepněte přímo na dlaždici v dráze v rytmu hudby</span>
           <span className="hidden sm:inline">
-            D · F · J · K (nebo 1–4) nebo klik na symboly nahoře · Enter Start · Esc Pauza · M Zvuk
+            D · F · J · K (nebo 1–4) nebo klik přímo na dráhu · Enter Start · Esc Pauza · M Zvuk
           </span>
         </p>
       </div>
