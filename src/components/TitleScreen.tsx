@@ -3,6 +3,7 @@ import { Play, Star, Volume2, VolumeX } from 'lucide-react';
 import { ITEMS, LEVELS } from '../game/levels';
 import type { ProgressMap } from '../game/types';
 import { ItemIcon, TitleEmblem } from './ItemIcons';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface TitleScreenProps {
   selectedLevelId: number;
@@ -32,7 +33,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between p-5 sm:p-7">
-      {/* Top Row: Bespoke SVG Brand Lockup (left) + Audio Toggle (right) */}
+      {/* Top Row: Bespoke SVG Brand Lockup (left) + Install & Audio Controls (right) */}
       <div className="flex items-start justify-between gap-4">
         <div className="pointer-events-auto max-w-md rounded-xl border border-[#e2b86b]/20 bg-[#16110e]/88 px-5 py-4">
           <div className="flex items-center gap-3.5">
@@ -48,15 +49,19 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onToggleMute}
-          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-lg border border-[#f5efe6]/15 bg-[#16110e]/88 text-[#f5efe6] hover:border-[#e2b86b]/55 hover:bg-[#241b16] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd269]"
-          aria-label={muted ? 'Zapnout zvuk' : 'Ztlumit zvuk'}
-          title={muted ? 'Zapnout zvuk (M)' : 'Ztlumit zvuk (M)'}
-        >
-          {muted ? <VolumeX className="w-5 h-5 text-[#e05252]" /> : <Volume2 className="w-5 h-5 text-[#e2b86b]" />}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <PWAInstallButton />
+
+          <button
+            type="button"
+            onClick={onToggleMute}
+            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-lg border border-[#f5efe6]/15 bg-[#16110e]/88 text-[#f5efe6] hover:border-[#e2b86b]/55 hover:bg-[#241b16] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd269]"
+            aria-label={muted ? 'Zapnout zvuk' : 'Ztlumit zvuk'}
+            title={muted ? 'Zapnout zvuk (M)' : 'Ztlumit zvuk (M)'}
+          >
+            {muted ? <VolumeX className="w-5 h-5 text-[#e05252]" /> : <Volume2 className="w-5 h-5 text-[#e2b86b]" />}
+          </button>
+        </div>
       </div>
 
       {/* Bottom Dock: Selected Level Action + Compact 10-Level Selector Strip */}

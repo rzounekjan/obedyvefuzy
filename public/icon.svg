@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#291e16" />
+      <stop offset="100%" stop-color="#120e0b" />
+    </radialGradient>
+    <linearGradient id="brassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d182" />
+      <stop offset="50%" stop-color="#d99b38" />
+      <stop offset="100%" stop-color="#a86f1e" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="108" fill="url(#bgGrad)" />
+  <circle cx="256" cy="256" r="204" fill="none" stroke="url(#brassGrad)" stroke-width="14" stroke-opacity="0.88" />
+  <circle cx="256" cy="256" r="158" fill="none" stroke="#f5efe6" stroke-width="6" stroke-opacity="0.22" />
+
+  <!-- Stylized Dinner Fork (Left) -->
+  <g stroke="#f5efe6" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M164 148 V212 C164 234 178 248 196 248 V366" />
+    <path d="M196 148 V210" />
+    <path d="M228 148 V212 C228 234 214 248 196 248" />
+  </g>
+
+  <!-- Golden Musical Eighth Notes (Right) -->
+  <g fill="none" stroke="url(#brassGrad)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M272 324 V178 L360 152 V296" />
+    <path d="M272 214 L360 188" stroke-width="14" />
+  </g>
+  <ellipse cx="250" cy="328" rx="30" ry="22" fill="url(#brassGrad)" transform="rotate(-18 250 328)" />
+  <ellipse cx="338" cy="300" rx="30" ry="22" fill="url(#brassGrad)" transform="rotate(-18 338 300)" />
+</svg>

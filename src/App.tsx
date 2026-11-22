@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GameHud } from './components/GameHud';
 import { GameModals } from './components/GameModals';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { TitleScreen } from './components/TitleScreen';
 import { TopSymbolBar } from './components/TopSymbolBar';
 import { ALT_LANE_KEYS, LANE_KEYS, LEVELS } from './game/levels';
@@ -305,6 +306,9 @@ export default function App() {
         onNextLevel={handleNextLevel}
         onReturnToTitle={handleReturnToTitle}
       />
+
+      {/* Offline PWA Status Indicator */}
+      <OfflineIndicator />
     </main>
   );
 }
