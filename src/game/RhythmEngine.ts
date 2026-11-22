@@ -140,6 +140,14 @@ export class RhythmEngine {
   private hitstopTimer = 0;
   private currentBeat = 0;
 
+  // Responsive viewport-adaptive camera metrics (ensures all 4 lanes fit on portrait phones)
+  private portraitFactor = 0;
+  private playCamBaseY = 6.55;
+  private playCamBaseZ = 10.45;
+  private playLookY = 0.35;
+  private playLookZ = -4.4;
+  private sceneFog!: THREE.FogExp2;
+
   // Scene objects
   private beatLines: THREE.Mesh[] = [];
   private strikePads: THREE.Mesh[] = [];
@@ -211,13 +219,16 @@ export class RhythmEngine {
     // 2. Scene & Horizon-matched Atmospheric Fog
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x120e0b);
-    this.scene.fog = new THREE.FogExp2(0x120e0b, 0.026);
+    this.sceneFog = new THREE.FogExp2(0x120e0b, 0.026);
+    this.scene.fog = this.sceneFog;
 
-    // 3. Camera
-    const aspect = (container.clientWidth || window.innerWidth) / Math.max(1, container.clientHeight || window.innerHeight);
-    this.camera = new THREE.PerspectiveCamera(48, aspect, 0.1, 120);
-    this.camera.position.set(0, 6.6, 10.6);
-    this.camera.lookAt(0, 0.4, -4.5);
+    // 3. Camera (responsive framing for desktop landscape & portrait mobile)
+    const initW = container.clientWidth || window.innerWidth;
+    const initH = Math.max(1, container.clientHeight || window.innerHeight);
+    this.camera = new THREE.PerspectiveCamera(48, initW / initH, 0.1, 140);
+    this.updateResponsiveCamera(initW, initH);
+    this.camera.position.set(0, this.playCamBaseY, this.playCamBaseZ);
+    this.camera.lookAt(0, this.playLookY, this.playLookZ);
 
     // 4. Studio Environment Map (RoomEnvironment on every device)
     const pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -418,7 +429,7 @@ export class RhythmEngine {
 
     // 4 Interactive 3D Strike Pads (one per lane) + invisible raycast proxy planes on Layer 1
     const padGeo = new THREE.BoxGeometry(LANE_WIDTH - 0.18, 0.08, 1.38);
-    const proxyGeo = new THREE.PlaneGeometry(LANE_WIDTH, 14);
+    const proxyGeo = new THREE.PlaneGeometry(LANE_WIDTH, 24);
     const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
 
     for (let lane = 0; lane < LANE_COUNT; lane++) {
@@ -436,10 +447,10 @@ export class RhythmEngine {
       this.strikePads.push(pad);
       this.strikePadMats.push(padMat);
 
-      // Raycast hit proxy covering lower lane area for easy direct canvas clicking/tapping
+      // Raycast hit proxy covering lower-to-mid lane area for comfortable direct touch/click
       const proxy = new THREE.Mesh(proxyGeo, proxyMat);
       proxy.rotation.x = -Math.PI / 2;
-      proxy.position.set(LANE_X[lane], 0.06, STRIKE_Z - 3.5);
+      proxy.position.set(LANE_X[lane], 0.06, STRIKE_Z - 5.5);
       proxy.userData = { lane };
       proxy.layers.set(1);
       this.scene.add(proxy);
@@ -939,11 +950,53 @@ export class RhythmEngine {
     }
   }
 
+  private updateResponsiveCamera(width: number, height: number): void {
+    const rawAspect = width / Math.max(1, height);
+    const aspect = Math.max(0.36, rawAspect);
+
+    // 0 on desktop/landscape (>= 1.15), smoothly ramps to 1 on tall portrait phones (<= 0.45)
+    const portraitT = THREE.MathUtils.clamp((1.15 - aspect) / (1.15 - 0.45), 0, 1);
+    this.portraitFactor = portraitT;
+
+    const fov = THREE.MathUtils.lerp(48, 56, portraitT);
+    const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(fov * 0.5));
+
+    // Guarantee all 4 lanes (TRACK_WIDTH = 7.4) + both outer brass rails + breathing margin
+    // remain completely inside the horizontal frustum at the front edge of the strike pads.
+    const strikeFrontZ = STRIKE_Z + 0.85;
+    const requiredHalfWidth = TRACK_WIDTH * 0.5 + 0.62; // 4.32 world units
+    const desktopFrontDepth = 8.43;
+    const frontDepth = Math.max(desktopFrontDepth, requiredHalfWidth / (aspect * tanHalfFov));
+
+    const pitchDeg = THREE.MathUtils.lerp(22.66, 32.5, portraitT);
+    const pitchRad = THREE.MathUtils.degToRad(pitchDeg);
+    const sinP = Math.sin(pitchRad);
+    const cosP = Math.cos(pitchRad);
+
+    const strikeDepth = frontDepth + (strikeFrontZ - STRIKE_Z) * cosP;
+    // Place strike line ~10% from bottom on desktop and ~20% from bottom on portrait phones
+    // so all 4 strike pads sit cleanly above Android/iOS navigation bars and thumb zones.
+    const strikeNdcY = THREE.MathUtils.lerp(-0.792, -0.60, portraitT);
+    const strikeVerticalOffset = strikeNdcY * strikeDepth * tanHalfFov;
+
+    this.playCamBaseY = strikeDepth * sinP - strikeVerticalOffset * cosP;
+    this.playCamBaseZ = STRIKE_Z + strikeDepth * cosP + strikeVerticalOffset * sinP;
+    this.playLookY = this.playCamBaseY - 16.09 * sinP;
+    this.playLookZ = this.playCamBaseZ - 16.09 * cosP;
+
+    // Scale atmospheric fog density inversely with pullback so distant notes stay crisp on mobile
+    const desktopStrikeDepth = 9.21;
+    this.sceneFog.density = THREE.MathUtils.clamp(0.026 * (desktopStrikeDepth / strikeDepth), 0.0125, 0.026);
+
+    this.camera.fov = fov;
+    this.camera.aspect = rawAspect;
+    this.camera.updateProjectionMatrix();
+  }
+
   private handleResize(): void {
     const w = this.container.clientWidth || window.innerWidth;
     const h = Math.max(1, this.container.clientHeight || window.innerHeight);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    this.updateResponsiveCamera(w, h);
     this.renderer.setSize(w, h);
   }
 
@@ -964,16 +1017,16 @@ export class RhythmEngine {
 
     if (this.phase === 'title') {
       this.elapsedIdle += dt;
-      // Gentle atmospheric turntable & camera pan on Title Screen
+      // Gentle atmospheric turntable & camera pan on Title Screen (pulls back slightly on portrait phones)
       const orbitAngle = Math.sin(this.elapsedIdle * 0.28) * 0.42;
-      const targetCamX = Math.sin(orbitAngle) * 3.8;
-      const targetCamY = 3.2 + Math.sin(this.elapsedIdle * 0.45) * 0.25;
-      const targetCamZ = 7.4 + Math.cos(orbitAngle) * 0.8;
+      const targetCamX = Math.sin(orbitAngle) * (3.8 - this.portraitFactor * 0.8);
+      const targetCamY = 3.2 + this.portraitFactor * 0.75 + Math.sin(this.elapsedIdle * 0.45) * 0.25;
+      const targetCamZ = 7.4 + this.portraitFactor * 2.5 + Math.cos(orbitAngle) * 0.8;
 
       this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, targetCamX, 3.5, dt);
       this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, targetCamY, 3.5, dt);
       this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, targetCamZ, 3.5, dt);
-      this.camera.lookAt(0, 1.05, 1.5);
+      this.camera.lookAt(0, 1.05 - this.portraitFactor * 0.25, 1.5);
 
       if (this.showcaseItemMesh) {
         this.showcaseItemMesh.rotation.y = this.elapsedIdle * 0.72;
@@ -987,15 +1040,15 @@ export class RhythmEngine {
     }
 
     // Playing / Paused / Victory / GameOver camera settle
-    const playCamY = 6.55 - this.beatPulse * 0.12;
-    const playCamZ = 10.45 - this.beatPulse * 0.16;
+    const playCamY = this.playCamBaseY - this.beatPulse * 0.12;
+    const playCamZ = this.playCamBaseZ - this.beatPulse * 0.16;
     const shakeX = this.cameraShake > 0 ? (Math.random() - 0.5) * this.cameraShake * 0.42 : 0;
     const shakeY = this.cameraShake > 0 ? (Math.random() - 0.5) * this.cameraShake * 0.28 : 0;
 
     this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, shakeX, 12, dt);
     this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, playCamY + shakeY, 10, dt);
     this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, playCamZ, 10, dt);
-    this.camera.lookAt(0, 0.35, -4.4);
+    this.camera.lookAt(0, this.playLookY, this.playLookZ);
 
     if (this.phase === 'playing') {
       this.audio.update();

@@ -16,9 +16,9 @@ interface TopSymbolBarProps {
  */
 export const TopSymbolBar: React.FC<TopSymbolBarProps> = ({ lanePrompts, onTriggerLane }) => {
   return (
-    <div className="pointer-events-none fixed top-3 left-1/2 -translate-x-1/2 z-20 w-[min(620px,94vw)] px-2">
+    <div className="pointer-events-none fixed top-[calc(max(8px,env(safe-area-inset-top))+50px)] md:top-3 left-1/2 -translate-x-1/2 z-20 w-[min(620px,calc(100vw-12px))] px-0.5 sm:px-2">
       <div
-        className="pointer-events-auto grid grid-cols-4 gap-2 sm:gap-3 rounded-xl border border-[#e2b86b]/25 bg-[#16110e]/92 p-2 shadow-[0_12px_32px_rgba(0,0,0,0.55)]"
+        className="pointer-events-auto grid grid-cols-4 gap-1.5 sm:gap-3 rounded-xl border border-[#e2b86b]/25 bg-[#16110e]/92 p-1.5 sm:p-2 shadow-[0_12px_32px_rgba(0,0,0,0.55)]"
         role="group"
         aria-label="Symboly blížící se řady"
       >
@@ -66,23 +66,23 @@ export const TopSymbolBar: React.FC<TopSymbolBarProps> = ({ lanePrompts, onTrigg
               style={{
                 transform: prompt.inHitWindow ? 'scale(1.03)' : 'scale(1)',
               }}
-              className={`relative flex flex-col items-center justify-between min-h-[78px] sm:min-h-[86px] rounded-lg border px-2 py-2 transition-transform duration-100 focus-visible:outline-2 focus-visible:outline-[#ffd269] cursor-pointer select-none overflow-hidden ${borderClass} ${bgClass}`}
+              className={`relative flex flex-col items-center justify-between min-h-[68px] sm:min-h-[86px] rounded-lg border px-1 sm:px-2 py-1.5 sm:py-2 transition-transform duration-100 focus-visible:outline-2 focus-visible:outline-[#ffd269] cursor-pointer select-none overflow-hidden ${borderClass} ${bgClass}`}
               aria-label={`${itemDef.name}, klávesa ${keyLabel}`}
             >
               {/* Top row: keycap hint & unique note star */}
-              <div className="w-full flex items-center justify-between text-[11px] leading-none">
-                <span className="font-mono-tabular font-bold text-[#c7b9a6] px-1.5 py-0.5 rounded bg-[#120e0b]/80 border border-[#f5efe6]/12">
+              <div className="w-full flex items-center justify-between text-[10px] sm:text-[11px] leading-none">
+                <span className="font-mono-tabular font-bold text-[#c7b9a6] px-1 sm:px-1.5 py-0.5 rounded bg-[#120e0b]/80 border border-[#f5efe6]/12">
                   {keyLabel}
                 </span>
                 {prompt.isUnique && prompt.hasNote ? (
                   <span
-                    className="text-[#ffd269] font-semibold tracking-tight text-[11px]"
+                    className="text-[#ffd269] font-semibold tracking-tight text-[10px] sm:text-[11px]"
                     title="Unikátní nota úrovně (2× body)"
                   >
                     ★ 2×
                   </span>
                 ) : (
-                  <span className="text-[#8a7c6c] text-[10px]">
+                  <span className="text-[#8a7c6c] text-[9px] sm:text-[10px]">
                     {prompt.isNextRow ? 'NYNÍ' : ''}
                   </span>
                 )}
@@ -90,19 +90,19 @@ export const TopSymbolBar: React.FC<TopSymbolBarProps> = ({ lanePrompts, onTrigg
 
               {/* Center tableware SVG symbol */}
               <div
-                className="my-1 flex items-center justify-center"
+                className="my-0.5 sm:my-1 flex items-center justify-center"
                 style={{ color: iconColor }}
               >
-                <ItemIcon item={prompt.item} className="w-7 h-7 sm:w-8 sm:h-8" />
+                <ItemIcon item={prompt.item} className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
 
               {/* Single-line Czech item label */}
-              <span className="w-full text-center text-[11px] sm:text-xs font-medium text-[#f5efe6]/90 truncate whitespace-nowrap">
+              <span className="w-full text-center text-[10px] sm:text-xs font-medium tracking-tight text-[#f5efe6]/92 truncate whitespace-nowrap pb-0.5">
                 {itemDef.shortName}
               </span>
 
               {/* Live rhythmic approach meter along bottom edge */}
-              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-[#120e0b]/90">
+              <div className="absolute bottom-0 left-0 right-0 h-1 sm:h-1.5 bg-[#120e0b]/90">
                 <div
                   className="h-full transition-opacity duration-75"
                   style={{
