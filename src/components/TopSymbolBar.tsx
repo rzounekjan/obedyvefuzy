@@ -18,7 +18,7 @@ export const TopSymbolBar: React.FC<TopSymbolBarProps> = ({ lanePrompts, onTrigg
   return (
     <div className="pointer-events-none fixed top-[calc(max(8px,env(safe-area-inset-top))+50px)] md:top-3 left-1/2 -translate-x-1/2 z-20 w-[min(620px,calc(100vw-12px))] px-0.5 sm:px-2">
       <div
-        className="pointer-events-auto grid grid-cols-4 gap-1.5 sm:gap-3 rounded-xl border border-[#e2b86b]/25 bg-[#16110e]/92 p-1.5 sm:p-2 shadow-[0_12px_32px_rgba(0,0,0,0.55)]"
+        className="pointer-events-auto grid grid-cols-4 gap-1.5 sm:gap-3 rounded-xl border-2 border-[#38bdf8] bg-[#141229] p-1.5 sm:p-2"
         role="group"
         aria-label="Symboly blížící se řady"
       >
@@ -27,32 +27,32 @@ export const TopSymbolBar: React.FC<TopSymbolBarProps> = ({ lanePrompts, onTrigg
           const keyLabel = LANE_KEYS[prompt.lane];
           const fillPct = Math.round(Math.min(1, Math.max(0, prompt.proximity)) * 100);
 
-          let borderClass = 'border-[#f5efe6]/12';
-          let bgClass = 'bg-[#211914]';
+          let borderClass = 'border-[#2d2858]';
+          let bgClass = 'bg-[#1d1a3a]';
           let iconColor = itemDef.accentHex;
 
           if (prompt.flashKind === 'perfect') {
-            borderClass = 'border-[#ffd269]';
-            bgClass = 'bg-[#423012]';
-            iconColor = '#ffe49e';
+            borderClass = 'border-[#ffd166]';
+            bgClass = 'bg-[#4f3b0c]';
+            iconColor = '#ffe9a6';
           } else if (prompt.flashKind === 'great') {
-            borderClass = 'border-[#4ac98c]';
-            bgClass = 'bg-[#153425]';
-            iconColor = '#84e8b7';
+            borderClass = 'border-[#06d6a0]';
+            bgClass = 'bg-[#0c3d30]';
+            iconColor = '#6ef7cf';
           } else if (prompt.flashKind === 'good') {
-            borderClass = 'border-[#67c8e0]';
-            bgClass = 'bg-[#152d36]';
-            iconColor = '#9ee4f5';
+            borderClass = 'border-[#38bdf8]';
+            bgClass = 'bg-[#0f344d]';
+            iconColor = '#93e1ff';
           } else if (prompt.flashKind === 'miss') {
-            borderClass = 'border-[#e05252]';
-            bgClass = 'bg-[#3b1515]';
-            iconColor = '#ff8a8a';
+            borderClass = 'border-[#ff3b6b]';
+            bgClass = 'bg-[#4d1124]';
+            iconColor = '#ff9bb3';
           } else if (prompt.inHitWindow) {
-            borderClass = prompt.isUnique ? 'border-[#ffd269]' : 'border-[#f5efe6]/85';
-            bgClass = prompt.isUnique ? 'bg-[#3b2910]' : 'bg-[#2e231c]';
+            borderClass = prompt.isUnique ? 'border-[#ffd166]' : 'border-[#ffffff]';
+            bgClass = prompt.isUnique ? 'bg-[#47300a]' : 'bg-[#2c2759]';
           } else if (prompt.isNextRow) {
-            borderClass = prompt.isUnique ? 'border-[#e2b86b]/75' : 'border-[#e2b86b]/45';
-            bgClass = 'bg-[#261d17]';
+            borderClass = prompt.isUnique ? 'border-[#ffd166]' : 'border-[#38bdf8]';
+            bgClass = 'bg-[#24204a]';
           }
 
           return (
@@ -66,29 +66,29 @@ export const TopSymbolBar: React.FC<TopSymbolBarProps> = ({ lanePrompts, onTrigg
               style={{
                 transform: prompt.inHitWindow ? 'scale(1.03)' : 'scale(1)',
               }}
-              className={`relative flex flex-col items-center justify-between min-h-[68px] sm:min-h-[86px] rounded-lg border px-1 sm:px-2 py-1.5 sm:py-2 transition-transform duration-100 focus-visible:outline-2 focus-visible:outline-[#ffd269] cursor-pointer select-none overflow-hidden ${borderClass} ${bgClass}`}
+              className={`relative flex flex-col items-center justify-between min-h-[68px] sm:min-h-[86px] rounded-lg border-2 px-1 sm:px-2 py-1.5 sm:py-2 transition-transform duration-100 focus-visible:outline-2 focus-visible:outline-[#ffd166] cursor-pointer select-none overflow-hidden ${borderClass} ${bgClass}`}
               aria-label={`${itemDef.name}, klávesa ${keyLabel}`}
             >
               {/* Top row: keycap hint & unique note star */}
               <div className="w-full flex items-center justify-between text-[10px] sm:text-[11px] leading-none">
-                <span className="font-mono-tabular font-bold text-[#c7b9a6] px-1 sm:px-1.5 py-0.5 rounded bg-[#120e0b]/80 border border-[#f5efe6]/12">
+                <span className="font-mono-tabular font-bold text-[#e2e8f0] px-1 sm:px-1.5 py-0.5 rounded bg-[#0f0d20] border border-[#3a346e]">
                   {keyLabel}
                 </span>
                 {prompt.isUnique && prompt.hasNote ? (
                   <span
-                    className="text-[#ffd269] font-semibold tracking-tight text-[10px] sm:text-[11px]"
+                    className="text-[#ffd166] font-bold tracking-tight text-[10px] sm:text-[11px]"
                     title="Unikátní nota úrovně (2× body)"
                   >
                     ★ 2×
                   </span>
                 ) : (
-                  <span className="text-[#8a7c6c] text-[9px] sm:text-[10px]">
+                  <span className="text-[#38bdf8] font-bold text-[9px] sm:text-[10px]">
                     {prompt.isNextRow ? 'NYNÍ' : ''}
                   </span>
                 )}
               </div>
 
-              {/* Center tableware SVG symbol */}
+              {/* Center vector tableware SVG symbol */}
               <div
                 className="my-0.5 sm:my-1 flex items-center justify-center"
                 style={{ color: iconColor }}
@@ -97,22 +97,21 @@ export const TopSymbolBar: React.FC<TopSymbolBarProps> = ({ lanePrompts, onTrigg
               </div>
 
               {/* Single-line Czech item label */}
-              <span className="w-full text-center text-[10px] sm:text-xs font-medium tracking-tight text-[#f5efe6]/92 truncate whitespace-nowrap pb-0.5">
+              <span className="w-full text-center text-[10px] sm:text-xs font-bold tracking-tight text-[#ffffff] truncate whitespace-nowrap pb-0.5">
                 {itemDef.shortName}
               </span>
 
-              {/* Live rhythmic approach meter along bottom edge */}
-              <div className="absolute bottom-0 left-0 right-0 h-1 sm:h-1.5 bg-[#120e0b]/90">
+              {/* Solid opaque rhythmic approach meter along bottom edge */}
+              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-[#0f0d20]">
                 <div
-                  className="h-full transition-opacity duration-75"
+                  className="h-full"
                   style={{
-                    width: `${fillPct}%`,
+                    width: prompt.hasNote ? `${fillPct}%` : '0%',
                     backgroundColor: prompt.inHitWindow
-                      ? '#ffd269'
+                      ? '#ffd166'
                       : prompt.isUnique
-                        ? '#e2b86b'
+                        ? '#ff9f1c'
                         : itemDef.accentHex,
-                    opacity: prompt.hasNote ? 1 : 0.15,
                   }}
                 />
               </div>

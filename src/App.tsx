@@ -262,7 +262,7 @@ export default function App() {
   ]);
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-[#120e0b]">
+    <main className="relative h-screen w-screen overflow-hidden bg-[#0b0a16]">
       {/* Isolated WebGL Viewport Container */}
       <div
         ref={canvasMountRef}

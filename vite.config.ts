@@ -29,8 +29,8 @@ export default defineConfig(() => {
           description:
             '3D rytmická hra ve stylu Magic Tiles se stolním servisem, deseti unikátními předměty a efekty v rytmu hudby.',
           lang: 'cs',
-          theme_color: '#120e0b',
-          background_color: '#120e0b',
+          theme_color: '#0b0a16',
+          background_color: '#0b0a16',
           display: 'standalone',
           orientation: 'any',
           start_url: base,

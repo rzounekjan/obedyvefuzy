@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type { ProceduralTexturePack } from './textures';
 import type { ItemType } from './types';
 
 export interface TablewareModelLibrary {
@@ -8,14 +7,12 @@ export interface TablewareModelLibrary {
 }
 
 /**
- * Builds composite 3–12 part PBR procedural 3D models for all 10 tableware items.
- * Every returned Group is pivoted cleanly at bottom-center (y = 0) so it rests
- * flush on its tile coaster or showcase pedestal.
+ * Pure unlit, opaque flat-vector 3D arcade artwork library for all 10 tableware items.
+ * Zero lights, zero reflections, zero shadows, zero transparency — 100% MeshBasicMaterial
+ * layered vector shapes backed by a bold dark silhouette slab so every icon stays razor-sharp
+ * from any angle and runs at locked 60 FPS even on entry-level mobile GPUs.
  */
-export function createTablewareModelLibrary(
-  textures: ProceduralTexturePack,
-  lowPower: boolean,
-): TablewareModelLibrary {
+export function createTablewareModelLibrary(): TablewareModelLibrary {
   const disposableGeos: THREE.BufferGeometry[] = [];
   const disposableMats: THREE.Material[] = [];
 
@@ -28,853 +25,572 @@ export function createTablewareModelLibrary(
     return m;
   };
 
-  // --- Shared PBR Material Palette ---
-  // On mobile/entry GPUs (e.g. Mali-G57 MP1), MeshStandardMaterial with calibrated IBL
-  // avoids expensive multi-lobe physical shaders & full-scene transmission render passes.
-  const matBrushedSteel = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          color: 0xe4e8ee,
-          metalness: 0.92,
-          roughness: 0.18,
-          envMapIntensity: 1.25,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          color: 0xe4e8ee,
-          metalness: 0.94,
-          roughness: 0.16,
-          anisotropy: 0.75,
-          clearcoat: 0.25,
+  // --- Shared Unlit Opaque Arcade Vector Palette (100% MeshBasicMaterial, zero alpha) ---
+  const matCache = new Map<number, THREE.MeshBasicMaterial>();
+  const flatMat = (hex: number): THREE.MeshBasicMaterial => {
+    let m = matCache.get(hex);
+    if (!m) {
+      m = trackMat(
+        new THREE.MeshBasicMaterial({
+          color: hex,
+          side: THREE.DoubleSide,
         }),
-  );
-
-  const matPolishedSilver = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          color: 0xf1f4f8,
-          metalness: 0.95,
-          roughness: 0.12,
-          envMapIntensity: 1.35,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          color: 0xf1f4f8,
-          metalness: 0.96,
-          roughness: 0.1,
-          clearcoat: 0.4,
-        }),
-  );
-
-  const matBrushedBrass = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          color: 0xd9a84e,
-          metalness: 0.9,
-          roughness: 0.22,
-          envMapIntensity: 1.2,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          color: 0xd9a84e,
-          metalness: 0.92,
-          roughness: 0.2,
-          anisotropy: 0.65,
-        }),
-  );
-
-  const matWalnutHandle = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0x3b2316,
-      metalness: 0.04,
-      roughness: 0.62,
-    }),
-  );
-
-  const matPorcelain = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          color: 0xf8f3eb,
-          metalness: 0.04,
-          roughness: 0.14,
-          envMapIntensity: 1.2,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          color: 0xf8f3eb,
-          metalness: 0.0,
-          roughness: 0.14,
-          clearcoat: 0.9,
-          clearcoatRoughness: 0.08,
-        }),
-  );
-
-  const matPorcelainMatteFoot = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0xe6ded2,
-      metalness: 0.0,
-      roughness: 0.75,
-    }),
-  );
-
-  const matClearGlass = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          color: 0xe8f9ff,
-          metalness: 0.16,
-          roughness: 0.07,
-          transparent: true,
-          opacity: 0.36,
-          envMapIntensity: 1.55,
-          depthWrite: false,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          color: 0xf0faff,
-          metalness: 0.0,
-          roughness: 0.06,
-          transmission: 0.88,
-          transparent: true,
-          opacity: 0.96,
-          ior: 1.52,
-          thickness: 0.4,
-          clearcoat: 1.0,
-          depthWrite: false,
-        }),
-  );
-
-  const matHeavyCrystal = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          color: 0xf4faff,
-          metalness: 0.18,
-          roughness: 0.09,
-          transparent: true,
-          opacity: 0.42,
-          envMapIntensity: 1.6,
-          depthWrite: false,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          color: 0xffffff,
-          metalness: 0.05,
-          roughness: 0.08,
-          transmission: 0.86,
-          transparent: true,
-          opacity: 0.98,
-          ior: 1.62,
-          thickness: 0.65,
-          clearcoat: 1.0,
-          depthWrite: false,
-        }),
-  );
-
-  const matWaterLiquid = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          color: 0x76d6ec,
-          metalness: 0.05,
-          roughness: 0.1,
-          transparent: true,
-          opacity: 0.74,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          color: 0x76d6ec,
-          metalness: 0.0,
-          roughness: 0.08,
-          transparent: true,
-          opacity: 0.72,
-          clearcoat: 0.8,
-        }),
-  );
-
-  const matIce = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0xdff7ff,
-      metalness: 0.05,
-      roughness: 0.18,
-      transparent: true,
-      opacity: 0.78,
-    }),
-  );
-
-  const matLemonRind = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0xf2ca38,
-      roughness: 0.52,
-      metalness: 0.0,
-    }),
-  );
-
-  const matLemonPulp = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0xfbf09a,
-      roughness: 0.3,
-      metalness: 0.0,
-    }),
-  );
-
-  const matBeerLiquid = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          color: 0xe69517,
-          emissive: 0x542c00,
-          emissiveIntensity: 0.25,
-          metalness: 0.04,
-          roughness: 0.14,
-          transparent: true,
-          opacity: 0.92,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          color: 0xe69517,
-          emissive: 0x542c00,
-          emissiveIntensity: 0.25,
-          metalness: 0.0,
-          roughness: 0.12,
-          transparent: true,
-          opacity: 0.92,
-          clearcoat: 0.6,
-        }),
-  );
-
-  const matBeerFoam = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0xfffaf0,
-      metalness: 0.0,
-      roughness: 0.88,
-    }),
-  );
-
-  const matSpiritLiquid = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0xe6842c,
-      emissive: 0x4f2005,
-      emissiveIntensity: 0.22,
-      metalness: 0.04,
-      roughness: 0.1,
-      transparent: true,
-      opacity: 0.86,
-    }),
-  );
-
-  const matClothFabric = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          map: textures.clothGingham,
-          metalness: 0.0,
-          roughness: 0.88,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          map: textures.clothGingham,
-          metalness: 0.0,
-          roughness: 0.88,
-          sheen: 0.45,
-          sheenRoughness: 0.8,
-        }),
-  );
-
-  const matClothStitch = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0x8f2419,
-      metalness: 0.0,
-      roughness: 0.82,
-    }),
-  );
-
-  const matNapkinLinen = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          map: textures.napkinDamask,
-          metalness: 0.0,
-          roughness: 0.82,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          map: textures.napkinDamask,
-          metalness: 0.0,
-          roughness: 0.82,
-          sheen: 0.55,
-          sheenColor: new THREE.Color(0xfff5e4),
-        }),
-  );
-
-  const matCrimsonRibbon = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0x9e2334,
-      metalness: 0.05,
-      roughness: 0.45,
-    }),
-  );
-
-  const matWineBottleGlass = trackMat(
-    lowPower
-      ? new THREE.MeshStandardMaterial({
-          color: 0x154229,
-          metalness: 0.16,
-          roughness: 0.1,
-          envMapIntensity: 1.45,
-        })
-      : new THREE.MeshPhysicalMaterial({
-          color: 0x154229,
-          metalness: 0.08,
-          roughness: 0.09,
-          clearcoat: 1.0,
-          clearcoatRoughness: 0.06,
-        }),
-  );
-
-  const matWineFoil = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0x7d192b,
-      metalness: 0.68,
-      roughness: 0.28,
-    }),
-  );
-
-  const matCork = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0xc29563,
-      metalness: 0.0,
-      roughness: 0.92,
-    }),
-  );
-
-  const matWineLabel = trackMat(
-    new THREE.MeshStandardMaterial({
-      map: textures.wineLabel,
-      metalness: 0.02,
-      roughness: 0.68,
-    }),
-  );
-
-  // --- Shared Prebuilt Geometries for All 10 Tableware Items ---
-  // Adaptive radial/tubular segment counts keep silhouettes smooth while cutting vertex load ~50% on mobile
-  const segHi = lowPower ? 18 : 32;
-  const segMed = lowPower ? 14 : 24;
-  const segLo = lowPower ? 8 : 12;
-  const tubeSeg = lowPower ? 12 : 20;
-
-  // Cutlery Rest (used under knife, fork, spoon so they sit elevated & angled cleanly)
-  const geoRestBar = trackGeo(new THREE.CylinderGeometry(0.055, 0.065, 0.48, segLo));
-  const geoRestFoot = trackGeo(new THREE.SphereGeometry(0.08, segLo, lowPower ? 6 : 10));
-
-  // 1. KNIFE geometries
-  const knifeBladeShape = new THREE.Shape();
-  knifeBladeShape.moveTo(0, 0);
-  knifeBladeShape.lineTo(0.11, 0);
-  knifeBladeShape.quadraticCurveTo(0.135, 0.42, 0.09, 0.72);
-  knifeBladeShape.quadraticCurveTo(0.04, 0.8, 0.0, 0.76);
-  knifeBladeShape.lineTo(0, 0);
-  const geoKnifeBlade = trackGeo(
-    new THREE.ExtrudeGeometry(knifeBladeShape, {
-      depth: 0.024,
-      bevelEnabled: true,
-      bevelThickness: 0.008,
-      bevelSize: 0.008,
-      bevelSegments: lowPower ? 1 : 2,
-      curveSegments: lowPower ? 6 : 12,
-    }),
-  );
-  geoKnifeBlade.center();
-
-  const geoKnifeBolster = trackGeo(new THREE.CylinderGeometry(0.068, 0.078, 0.11, segLo));
-  const geoKnifeHandle = trackGeo(new THREE.CapsuleGeometry(0.068, 0.44, lowPower ? 4 : 6, segLo));
-  const geoKnifeRivet = trackGeo(new THREE.CylinderGeometry(0.018, 0.018, 0.15, lowPower ? 6 : 10));
-  const geoKnifePommel = trackGeo(new THREE.SphereGeometry(0.072, segLo, lowPower ? 6 : 10));
-
-  // 2. FORK geometries
-  const geoForkHandle = trackGeo(new THREE.CapsuleGeometry(0.056, 0.56, lowPower ? 4 : 6, segLo));
-  const geoForkRidge = trackGeo(new THREE.BoxGeometry(0.04, 0.48, 0.09));
-  const geoForkNeck = trackGeo(new THREE.CylinderGeometry(0.045, 0.06, 0.24, segLo));
-  const geoForkShoulder = trackGeo(new THREE.BoxGeometry(0.28, 0.1, 0.042));
-  const geoForkTine = trackGeo(new THREE.CylinderGeometry(0.011, 0.021, 0.42, lowPower ? 6 : 8));
-
-  // 3. SPOON geometries
-  const geoSpoonBowl = trackGeo(
-    new THREE.SphereGeometry(0.2, lowPower ? 12 : 20, lowPower ? 8 : 14, 0, Math.PI * 2, Math.PI * 0.52, Math.PI * 0.48),
-  );
-  const geoSpoonRim = trackGeo(new THREE.TorusGeometry(0.195, 0.018, lowPower ? 6 : 10, segMed));
-  const spoonCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, 0.08, 0),
-    new THREE.Vector3(0, 0.36, -0.05),
-    new THREE.Vector3(0, 0.72, -0.02),
-    new THREE.Vector3(0, 0.96, 0.03),
-  ]);
-  const geoSpoonStem = trackGeo(new THREE.TubeGeometry(spoonCurve, tubeSeg, 0.036, lowPower ? 7 : 10, false));
-  const geoSpoonTip = trackGeo(new THREE.SphereGeometry(0.082, segLo, lowPower ? 6 : 10));
-
-  // 4. CLOTH (Hadr na stůl) geometries
-  const clothFoldShape = new THREE.Shape();
-  clothFoldShape.moveTo(-0.46, -0.36);
-  clothFoldShape.lineTo(0.46, -0.36);
-  clothFoldShape.lineTo(0.46, 0.36);
-  clothFoldShape.lineTo(-0.46, 0.36);
-  clothFoldShape.closePath();
-  const geoClothLayer = trackGeo(
-    new THREE.ExtrudeGeometry(clothFoldShape, {
-      depth: 0.09,
-      bevelEnabled: true,
-      bevelThickness: 0.028,
-      bevelSize: 0.032,
-      bevelSegments: lowPower ? 1 : 3,
-    }),
-  );
-  geoClothLayer.rotateX(-Math.PI / 2);
-  const geoClothCrease = trackGeo(new THREE.CylinderGeometry(0.085, 0.085, 0.94, segLo));
-  const geoClothHem = trackGeo(new THREE.BoxGeometry(0.96, 0.024, 0.04));
-  const geoClothLoop = trackGeo(new THREE.TorusGeometry(0.08, 0.018, lowPower ? 6 : 8, lowPower ? 10 : 16));
-
-  // 5. PLATE (Talíř) geometries — all prebuilt once (zero per-note allocations)
-  const platePoints = [
-    new THREE.Vector2(0.0, 0.02),
-    new THREE.Vector2(0.28, 0.02),
-    new THREE.Vector2(0.32, 0.0), // foot ring resting at y=0
-    new THREE.Vector2(0.37, 0.0),
-    new THREE.Vector2(0.42, 0.045),
-    new THREE.Vector2(0.64, 0.145),
-    new THREE.Vector2(0.67, 0.175),
-    new THREE.Vector2(0.63, 0.195),
-    new THREE.Vector2(0.41, 0.095),
-    new THREE.Vector2(0.32, 0.062),
-    new THREE.Vector2(0.0, 0.055),
-  ];
-  const geoPlateBody = trackGeo(new THREE.LatheGeometry(platePoints, lowPower ? 20 : 36));
-  const geoPlateFoot = trackGeo(new THREE.TorusGeometry(0.34, 0.018, lowPower ? 6 : 8, segHi));
-  const geoPlateStand = trackGeo(new THREE.CylinderGeometry(0.18, 0.26, 0.14, lowPower ? 10 : 16));
-  const geoPlateGoldRim = trackGeo(new THREE.TorusGeometry(0.635, 0.014, lowPower ? 6 : 10, lowPower ? 22 : 40));
-  const geoPlateInnerRing = trackGeo(new THREE.TorusGeometry(0.36, 0.008, lowPower ? 6 : 8, segHi));
-  const geoPlateCenterCrest = trackGeo(new THREE.CylinderGeometry(0.11, 0.11, 0.008, lowPower ? 12 : 20));
-
-  // 6. WATER GLASS (Sklenice s vodou) geometries
-  const waterOuterPts = [
-    new THREE.Vector2(0.0, 0.0),
-    new THREE.Vector2(0.27, 0.0),
-    new THREE.Vector2(0.33, 0.98),
-    new THREE.Vector2(0.305, 0.99),
-    new THREE.Vector2(0.25, 0.11),
-    new THREE.Vector2(0.0, 0.11),
-  ];
-  const geoWaterGlass = trackGeo(new THREE.LatheGeometry(waterOuterPts, lowPower ? 16 : 28));
-  const geoWaterLiquid = trackGeo(new THREE.CylinderGeometry(0.285, 0.24, 0.68, segMed));
-  const geoIceCube = trackGeo(new THREE.BoxGeometry(0.14, 0.13, 0.14));
-  const geoLemonSlice = trackGeo(new THREE.CylinderGeometry(0.16, 0.16, 0.036, lowPower ? 10 : 18, 1, false, 0, Math.PI * 1.15));
-  const geoLemonPulp = trackGeo(new THREE.CylinderGeometry(0.135, 0.135, 0.04, lowPower ? 10 : 18, 1, false, 0, Math.PI * 1.15));
-
-  // 7. BEER MUG (Sklenice s pivem — Český půllitr) geometries
-  const beerOuterPts = [
-    new THREE.Vector2(0.0, 0.0),
-    new THREE.Vector2(0.34, 0.0),
-    new THREE.Vector2(0.36, 0.16),
-    new THREE.Vector2(0.35, 1.02),
-    new THREE.Vector2(0.315, 1.03),
-    new THREE.Vector2(0.31, 0.18),
-    new THREE.Vector2(0.0, 0.18),
-  ];
-  const geoBeerMug = trackGeo(new THREE.LatheGeometry(beerOuterPts, lowPower ? 14 : 20));
-  const beerHandleCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0.33, 0.86, 0),
-    new THREE.Vector3(0.57, 0.82, 0),
-    new THREE.Vector3(0.59, 0.52, 0),
-    new THREE.Vector3(0.53, 0.26, 0),
-    new THREE.Vector3(0.33, 0.24, 0),
-  ]);
-  const geoBeerHandle = trackGeo(new THREE.TubeGeometry(beerHandleCurve, tubeSeg, 0.055, lowPower ? 7 : 10, false));
-  const geoBeerLiquid = trackGeo(new THREE.CylinderGeometry(0.305, 0.295, 0.68, lowPower ? 14 : 20));
-  const geoBeerFoamCap = trackGeo(new THREE.CylinderGeometry(0.315, 0.305, 0.22, lowPower ? 14 : 20));
-  const geoBeerFoamPuff = trackGeo(new THREE.SphereGeometry(0.14, lowPower ? 8 : 12, lowPower ? 6 : 10));
-  const geoBeerBand = trackGeo(new THREE.TorusGeometry(0.355, 0.015, lowPower ? 6 : 8, segMed));
-
-  // 8. SHOT GLASS (Panák) geometries
-  const shotPts = [
-    new THREE.Vector2(0.0, 0.0),
-    new THREE.Vector2(0.21, 0.0),
-    new THREE.Vector2(0.27, 0.68),
-    new THREE.Vector2(0.245, 0.69),
-    new THREE.Vector2(0.195, 0.2), // thick heavy base
-    new THREE.Vector2(0.0, 0.2),
-  ];
-  const geoShotGlass = trackGeo(new THREE.LatheGeometry(shotPts, segMed));
-  const geoShotBaseSlug = trackGeo(new THREE.CylinderGeometry(0.195, 0.205, 0.19, segMed));
-  const geoShotLiquid = trackGeo(new THREE.CylinderGeometry(0.228, 0.192, 0.34, segMed));
-  const geoShotGoldRim = trackGeo(new THREE.TorusGeometry(0.262, 0.011, lowPower ? 6 : 8, segMed));
-
-  // 9. NAPKIN (Ubrousek) geometries
-  const geoNapkinCone = trackGeo(new THREE.ConeGeometry(0.34, 0.98, 4, 1));
-  const geoNapkinWing = trackGeo(new THREE.ConeGeometry(0.24, 0.86, 4, 1));
-  const geoNapkinRing = trackGeo(new THREE.TorusGeometry(0.22, 0.042, lowPower ? 8 : 14, segMed));
-  const geoNapkinRibbon = trackGeo(new THREE.TorusGeometry(0.245, 0.018, lowPower ? 6 : 10, segMed));
-  const geoNapkinBase = trackGeo(new THREE.CylinderGeometry(0.31, 0.34, 0.06, lowPower ? 10 : 16));
-
-  // 10. WINE BOTTLE (Láhev vína) geometries
-  const winePts = [
-    new THREE.Vector2(0.0, 0.06), // punt indentation
-    new THREE.Vector2(0.16, 0.06),
-    new THREE.Vector2(0.26, 0.0),
-    new THREE.Vector2(0.30, 0.02),
-    new THREE.Vector2(0.30, 0.84),
-    new THREE.Vector2(0.28, 0.96),
-    new THREE.Vector2(0.18, 1.09),
-    new THREE.Vector2(0.115, 1.18),
-    new THREE.Vector2(0.108, 1.52),
-    new THREE.Vector2(0.125, 1.55), // lip
-    new THREE.Vector2(0.125, 1.59),
-    new THREE.Vector2(0.092, 1.59),
-    new THREE.Vector2(0.092, 1.50),
-  ];
-  const geoWineBottle = trackGeo(new THREE.LatheGeometry(winePts, segHi));
-  const geoWineFoil = trackGeo(new THREE.CylinderGeometry(0.114, 0.116, 0.28, segMed, 1, true));
-  const geoWineFoilCap = trackGeo(new THREE.CylinderGeometry(0.128, 0.128, 0.055, segMed));
-  const geoWineCork = trackGeo(new THREE.CylinderGeometry(0.088, 0.082, 0.13, lowPower ? 10 : 18));
-  const geoWineLabel = trackGeo(
-    new THREE.CylinderGeometry(0.306, 0.306, 0.44, lowPower ? 16 : 28, 1, true, -Math.PI * 0.45, Math.PI * 0.9),
-  );
-  const geoWineNeckCollar = trackGeo(new THREE.TorusGeometry(0.118, 0.012, lowPower ? 6 : 8, segMed));
-
-  function makeMesh(
-    geo: THREE.BufferGeometry,
-    mat: THREE.Material,
-    castShadow = true,
-    renderOrder = 0,
-  ): THREE.Mesh {
-    const m = new THREE.Mesh(geo, mat);
-    m.castShadow = !lowPower && castShadow;
-    m.receiveShadow = !lowPower;
-    m.renderOrder = renderOrder;
+      );
+      matCache.set(hex, m);
+    }
     return m;
+  };
+
+  const C = {
+    outline: 0x090814,
+    white: 0xffffff,
+    cream: 0xfff8e7,
+    creamShade: 0xe6dcc8,
+    silver: 0xe2e8f0,
+    silverLight: 0xf8fafc,
+    silverDark: 0x94a3b8,
+    gold: 0xffd166,
+    goldDark: 0xe09f24,
+    wood: 0x9a4a1c,
+    woodDark: 0x6b2f0e,
+    red: 0xef476f,
+    redBright: 0xff4d6d,
+    redDark: 0x9e1b3b,
+    clothRed: 0xe63946,
+    clothPink: 0xf48c94,
+    waterGlass: 0x7dd3fc,
+    waterFill: 0x0ea5e9,
+    waterLight: 0xe0f2fe,
+    lemon: 0xfde047,
+    lemonPulp: 0xfef08a,
+    beer: 0xf59e0b,
+    beerBright: 0xfbbf24,
+    beerDark: 0xd97706,
+    foam: 0xffffff,
+    foamShade: 0xfef3c7,
+    shotGlass: 0xbae6fd,
+    spirit: 0xf97316,
+    spiritLight: 0xfdba74,
+    wineGreen: 0x16a34a,
+    wineDark: 0x14532d,
+    wineLight: 0x4ade80,
+    wineFoil: 0xbe123c,
+    cork: 0xd97706,
+  } as const;
+
+  // Helper: create rounded rectangle THREE.Shape centered at (cx, cy)
+  function roundedRect(cx: number, cy: number, w: number, h: number, r: number): THREE.Shape {
+    const hw = w * 0.5;
+    const hh = h * 0.5;
+    const rr = Math.min(r, hw, hh);
+    const s = new THREE.Shape();
+    s.moveTo(cx - hw + rr, cy - hh);
+    s.lineTo(cx + hw - rr, cy - hh);
+    s.quadraticCurveTo(cx + hw, cy - hh, cx + hw, cy - hh + rr);
+    s.lineTo(cx + hw, cy + hh - rr);
+    s.quadraticCurveTo(cx + hw, cy + hh, cx + hw - rr, cy + hh);
+    s.lineTo(cx - hw + rr, cy + hh);
+    s.quadraticCurveTo(cx - hw, cy + hh, cx - hw, cy + hh - rr);
+    s.lineTo(cx - hw, cy - hh + rr);
+    s.quadraticCurveTo(cx - hw, cy - hh, cx - hw + rr, cy - hh);
+    return s;
   }
 
-  function addCutleryRest(parent: THREE.Group): void {
-    const bar = makeMesh(geoRestBar, matBrushedBrass);
-    bar.rotation.z = Math.PI / 2;
-    bar.position.set(0, 0.08, 0);
-    parent.add(bar);
-
-    const leftFoot = makeMesh(geoRestFoot, matBrushedBrass);
-    leftFoot.position.set(-0.24, 0.08, 0);
-    parent.add(leftFoot);
-
-    const rightFoot = makeMesh(geoRestFoot, matBrushedBrass);
-    rightFoot.position.set(0.24, 0.08, 0);
-    parent.add(rightFoot);
+  function circleShape(cx: number, cy: number, r: number): THREE.Shape {
+    const s = new THREE.Shape();
+    s.absarc(cx, cy, r, 0, Math.PI * 2, false);
+    return s;
   }
 
-  function createItemMesh(type: ItemType): THREE.Group {
-    const root = new THREE.Group();
+  function ellipseShape(cx: number, cy: number, rx: number, ry: number): THREE.Shape {
+    const s = new THREE.Shape();
+    s.absellipse(cx, cy, rx, ry, 0, Math.PI * 2, false, 0);
+    return s;
+  }
 
-    switch (type) {
-      case 'knife': {
-        addCutleryRest(root);
-        const body = new THREE.Group();
-        body.position.set(0, 0.62, 0);
-        body.rotation.set(0.18, 0.25, -0.32);
+  function polyShape(pts: [number, number][]): THREE.Shape {
+    const s = new THREE.Shape();
+    s.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) {
+      s.lineTo(pts[i][0], pts[i][1]);
+    }
+    s.closePath();
+    return s;
+  }
 
-        const blade = makeMesh(geoKnifeBlade, matBrushedSteel);
-        blade.position.set(0, 0.38, 0);
-        body.add(blade);
+  interface VectorLayerSpec {
+    geo: THREE.BufferGeometry;
+    mat: THREE.MeshBasicMaterial;
+    zOffset: number; // positive distance from center plane; mirrored automatically on back face
+  }
 
-        const bolster = makeMesh(geoKnifeBolster, matPolishedSilver);
-        bolster.position.set(0, -0.02, 0);
-        body.add(bolster);
+  interface VectorTokenBlueprint {
+    slabGeo: THREE.BufferGeometry;
+    layers: VectorLayerSpec[];
+    halfDepth: number;
+    yOffset: number;
+    scale: number;
+  }
 
-        const handle = makeMesh(geoKnifeHandle, matWalnutHandle);
-        handle.position.set(0, -0.31, 0);
-        body.add(handle);
+  // Helper to prebuild an unlit double-sided flat-vector token with crisp 3D dark edge backing
+  function buildBlueprint(
+    outlineShape: THREE.Shape,
+    layerDefs: { shape: THREE.Shape; color: number; depthRank: number; curveSegs?: number }[],
+    options?: { depth?: number; yOffset?: number; scale?: number; outlineSegs?: number },
+  ): VectorTokenBlueprint {
+    const depth = options?.depth ?? 0.08;
+    const halfDepth = depth * 0.5;
+    const slabGeo = trackGeo(
+      new THREE.ExtrudeGeometry(outlineShape, {
+        depth,
+        bevelEnabled: false,
+        curveSegments: options?.outlineSegs ?? 12,
+      }),
+    );
+    slabGeo.translate(0, 0, -halfDepth);
 
-        for (let r = 0; r < 3; r++) {
-          const rivet = makeMesh(geoKnifeRivet, matBrushedBrass, false);
-          rivet.rotation.x = Math.PI / 2;
-          rivet.position.set(0, -0.18 - r * 0.13, 0);
-          body.add(rivet);
-        }
+    const layers: VectorLayerSpec[] = layerDefs.map((ld) => ({
+      geo: trackGeo(new THREE.ShapeGeometry(ld.shape, ld.curveSegs ?? 12)),
+      mat: flatMat(ld.color),
+      zOffset: halfDepth + 0.008 + ld.depthRank * 0.009,
+    }));
 
-        const pommel = makeMesh(geoKnifePommel, matBrushedBrass);
-        pommel.position.set(0, -0.57, 0);
-        body.add(pommel);
+    return {
+      slabGeo,
+      layers,
+      halfDepth,
+      yOffset: options?.yOffset ?? 0.02,
+      scale: options?.scale ?? 1.0,
+    };
+  }
 
-        root.add(body);
-        break;
-      }
+  // =========================================================================
+  // 1. KNIFE (Obědový nůž) — Bold upright vector chef/dinner knife
+  // =========================================================================
+  const knifeOutline = polyShape([
+    [-0.17, 0.0],
+    [0.17, 0.0],
+    [0.17, 0.56],
+    [0.24, 0.62],
+    [0.24, 1.38],
+    [0.12, 1.54],
+    [-0.17, 1.5],
+    [-0.17, 0.0],
+  ]);
+  const knifeBlade = polyShape([
+    [-0.1, 0.6],
+    [0.17, 0.6],
+    [0.17, 1.34],
+    [0.08, 1.46],
+    [-0.1, 1.42],
+  ]);
+  const knifeEdge = polyShape([
+    [0.08, 0.62],
+    [0.17, 0.62],
+    [0.17, 1.34],
+    [0.08, 1.44],
+  ]);
+  const knifeHandle = roundedRect(0.0, 0.3, 0.22, 0.5, 0.06);
+  const knifeBolster = roundedRect(0.02, 0.58, 0.3, 0.1, 0.03);
+  const bpKnife = buildBlueprint(
+    knifeOutline,
+    [
+      { shape: knifeBlade, color: C.silver, depthRank: 0 },
+      { shape: knifeEdge, color: C.white, depthRank: 1 },
+      { shape: knifeHandle, color: C.wood, depthRank: 0 },
+      { shape: knifeBolster, color: C.gold, depthRank: 1 },
+      { shape: circleShape(0, 0.42, 0.035), color: C.gold, depthRank: 2, curveSegs: 8 },
+      { shape: circleShape(0, 0.29, 0.035), color: C.gold, depthRank: 2, curveSegs: 8 },
+      { shape: circleShape(0, 0.16, 0.035), color: C.gold, depthRank: 2, curveSegs: 8 },
+    ],
+    { scale: 0.94 },
+  );
 
-      case 'fork': {
-        addCutleryRest(root);
-        const body = new THREE.Group();
-        body.position.set(0, 0.62, 0);
-        body.rotation.set(0.15, -0.2, 0.22);
+  // =========================================================================
+  // 2. FORK (Obědová vidlička) — Crisp 4-tine arcade vector fork
+  // =========================================================================
+  const forkOutline = polyShape([
+    [-0.14, 0.0],
+    [0.14, 0.0],
+    [0.13, 0.72],
+    [0.34, 0.86],
+    [0.34, 1.5],
+    [-0.34, 1.5],
+    [-0.34, 0.86],
+    [-0.13, 0.72],
+  ]);
+  const forkHandle = roundedRect(0, 0.42, 0.16, 0.74, 0.06);
+  const forkNeck = roundedRect(0, 0.92, 0.54, 0.18, 0.06);
+  const forkBand = roundedRect(0, 0.24, 0.18, 0.1, 0.02);
+  const forkTineX = [-0.21, -0.07, 0.07, 0.21];
+  const bpFork = buildBlueprint(
+    forkOutline,
+    [
+      { shape: forkHandle, color: C.silver, depthRank: 0 },
+      { shape: forkNeck, color: C.silver, depthRank: 0 },
+      ...forkTineX.map((tx) => ({
+        shape: roundedRect(tx, 1.22, 0.075, 0.46, 0.03),
+        color: C.silverLight,
+        depthRank: 1,
+      })),
+      { shape: forkBand, color: C.gold, depthRank: 1 },
+      { shape: roundedRect(0, 0.52, 0.06, 0.34, 0.02), color: C.white, depthRank: 2 },
+    ],
+    { scale: 0.94 },
+  );
 
-        const handle = makeMesh(geoForkHandle, matPolishedSilver);
-        handle.position.set(0, -0.28, 0);
-        body.add(handle);
+  // =========================================================================
+  // 3. SPOON (Obědová lžička) — Bold silhouette vector spoon
+  // =========================================================================
+  const spoonOutline = new THREE.Shape();
+  spoonOutline.moveTo(-0.14, 0.0);
+  spoonOutline.lineTo(0.14, 0.0);
+  spoonOutline.lineTo(0.13, 0.82);
+  spoonOutline.quadraticCurveTo(0.36, 0.92, 0.36, 1.2);
+  spoonOutline.quadraticCurveTo(0.36, 1.54, 0.0, 1.54);
+  spoonOutline.quadraticCurveTo(-0.36, 1.54, -0.36, 1.2);
+  spoonOutline.quadraticCurveTo(-0.36, 0.92, -0.13, 0.82);
+  spoonOutline.closePath();
 
-        const ridge = makeMesh(geoForkRidge, matBrushedBrass, false);
-        ridge.position.set(0, -0.28, 0.01);
-        body.add(ridge);
+  const bpSpoon = buildBlueprint(
+    spoonOutline,
+    [
+      { shape: roundedRect(0, 0.48, 0.16, 0.84, 0.06), color: C.silver, depthRank: 0 },
+      { shape: ellipseShape(0, 1.18, 0.28, 0.3), color: C.silverLight, depthRank: 1, curveSegs: 16 },
+      { shape: ellipseShape(0, 1.18, 0.19, 0.21), color: C.silverDark, depthRank: 2, curveSegs: 14 },
+      { shape: ellipseShape(-0.07, 1.25, 0.07, 0.11), color: C.white, depthRank: 3, curveSegs: 10 },
+      { shape: roundedRect(0, 0.22, 0.18, 0.1, 0.02), color: C.gold, depthRank: 1 },
+    ],
+    { scale: 0.94 },
+  );
 
-        const neck = makeMesh(geoForkNeck, matBrushedSteel);
-        neck.position.set(0, 0.12, 0);
-        body.add(neck);
-
-        const shoulder = makeMesh(geoForkShoulder, matPolishedSilver);
-        shoulder.position.set(0, 0.25, 0);
-        body.add(shoulder);
-
-        const tineOffsets = [-0.105, -0.035, 0.035, 0.105];
-        for (const ox of tineOffsets) {
-          const tine = makeMesh(geoForkTine, matPolishedSilver);
-          tine.position.set(ox, 0.48, 0.02);
-          tine.rotation.x = 0.12;
-          body.add(tine);
-        }
-
-        root.add(body);
-        break;
-      }
-
-      case 'spoon': {
-        addCutleryRest(root);
-        const body = new THREE.Group();
-        body.position.set(0, 0.18, 0);
-        body.rotation.set(0.18, 0.15, -0.18);
-
-        const stem = makeMesh(geoSpoonStem, matPolishedSilver);
-        body.add(stem);
-
-        const tip = makeMesh(geoSpoonTip, matBrushedBrass);
-        tip.scale.set(1, 0.55, 1.3);
-        tip.position.set(0, 0.04, 0);
-        body.add(tip);
-
-        const bowl = makeMesh(geoSpoonBowl, matBrushedSteel);
-        bowl.scale.set(0.95, 0.72, 1.38);
-        bowl.rotation.x = -Math.PI * 0.42;
-        bowl.position.set(0, 1.05, 0.08);
-        body.add(bowl);
-
-        const rim = makeMesh(geoSpoonRim, matPolishedSilver, false);
-        rim.scale.set(0.95, 1.38, 1);
-        rim.rotation.x = 0.25;
-        rim.position.set(0, 1.07, 0.05);
-        body.add(rim);
-
-        root.add(body);
-        break;
-      }
-
-      case 'cloth': {
-        const lower = makeMesh(geoClothLayer, matClothFabric);
-        lower.position.set(0, 0.03, 0);
-        root.add(lower);
-
-        const upper = makeMesh(geoClothLayer, matClothFabric);
-        upper.scale.set(0.92, 0.9, 0.88);
-        upper.position.set(0.03, 0.15, -0.02);
-        upper.rotation.y = 0.12;
-        upper.rotation.z = -0.03;
-        root.add(upper);
-
-        const crease = makeMesh(geoClothCrease, matClothFabric);
-        crease.rotation.z = Math.PI / 2;
-        crease.position.set(0, 0.13, -0.35);
-        root.add(crease);
-
-        const hemFront = makeMesh(geoClothHem, matClothStitch, false);
-        hemFront.position.set(0, 0.09, 0.35);
-        root.add(hemFront);
-
-        const hemTop = makeMesh(geoClothHem, matClothStitch, false);
-        hemTop.scale.set(0.9, 1, 1);
-        hemTop.position.set(0.02, 0.22, 0.29);
-        hemTop.rotation.y = 0.12;
-        root.add(hemTop);
-
-        const loop = makeMesh(geoClothLoop, matClothStitch, false);
-        loop.position.set(0.42, 0.22, -0.26);
-        loop.rotation.x = Math.PI / 2;
-        root.add(loop);
-        break;
-      }
-
-      case 'plate': {
-        const body = makeMesh(geoPlateBody, matPorcelain);
-        root.add(body);
-
-        const foot = makeMesh(geoPlateFoot, matPorcelainMatteFoot, false);
-        foot.rotation.x = Math.PI / 2;
-        foot.position.y = 0.018;
-        root.add(foot);
-
-        const goldRim = makeMesh(geoPlateGoldRim, matBrushedBrass, false);
-        goldRim.rotation.x = Math.PI / 2;
-        goldRim.position.y = 0.188;
-        root.add(goldRim);
-
-        const innerRing = makeMesh(geoPlateInnerRing, matBrushedBrass, false);
-        innerRing.rotation.x = Math.PI / 2;
-        innerRing.position.y = 0.088;
-        root.add(innerRing);
-
-        const crest = makeMesh(geoPlateCenterCrest, matBrushedBrass, false);
-        crest.position.y = 0.06;
-        root.add(crest);
-
-        // Gently tilt the plate on a tiny brass display stand so its face shines toward the player
-        root.children.forEach((c) => {
-          c.position.y += 0.32;
-          c.rotation.x += 0.42;
+  // =========================================================================
+  // 4. CLOTH (Hadr na stůl) — Folded gingham checkerboard vector cloth
+  // =========================================================================
+  const clothOutline = roundedRect(0, 0.56, 1.16, 1.06, 0.12);
+  const clothLayers: { shape: THREE.Shape; color: number; depthRank: number; curveSegs?: number }[] = [
+    { shape: roundedRect(0, 0.56, 1.02, 0.92, 0.07), color: C.cream, depthRank: 0 },
+  ];
+  // 4x4 crisp red/pink checkered gingham vector grid
+  const gxStart = -0.36;
+  const gyStart = 0.22;
+  const gStep = 0.24;
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 4; col++) {
+      const cx = gxStart + col * gStep;
+      const cy = gyStart + row * gStep;
+      if ((row + col) % 2 === 0) {
+        clothLayers.push({
+          shape: roundedRect(cx, cy, 0.22, 0.2, 0.015),
+          color: C.clothRed,
+          depthRank: 1,
         });
-        const stand = makeMesh(geoPlateStand, matBrushedBrass);
-        stand.position.y = 0.07;
-        root.add(stand);
-        break;
-      }
-
-      case 'water': {
-        const liquid = makeMesh(geoWaterLiquid, matWaterLiquid, false, 1);
-        liquid.position.y = 0.46;
-        root.add(liquid);
-
-        const ice1 = makeMesh(geoIceCube, matIce, false, 2);
-        ice1.position.set(-0.07, 0.72, 0.04);
-        ice1.rotation.set(0.4, 0.6, 0.2);
-        root.add(ice1);
-
-        const ice2 = makeMesh(geoIceCube, matIce, false, 2);
-        ice2.position.set(0.08, 0.68, -0.05);
-        ice2.rotation.set(-0.3, 0.2, 0.5);
-        root.add(ice2);
-
-        const glass = makeMesh(geoWaterGlass, matClearGlass, true, 3);
-        root.add(glass);
-
-        const lemonGroup = new THREE.Group();
-        lemonGroup.position.set(0.28, 0.96, 0.04);
-        lemonGroup.rotation.set(0.1, 0.2, -0.65);
-        const rind = makeMesh(geoLemonSlice, matLemonRind, false, 4);
-        const pulp = makeMesh(geoLemonPulp, matLemonPulp, false, 4);
-        lemonGroup.add(rind, pulp);
-        root.add(lemonGroup);
-        break;
-      }
-
-      case 'beer': {
-        const liquid = makeMesh(geoBeerLiquid, matBeerLiquid, false, 1);
-        liquid.position.y = 0.52;
-        root.add(liquid);
-
-        const foamCap = makeMesh(geoBeerFoamCap, matBeerFoam, true, 2);
-        foamCap.position.y = 0.95;
-        root.add(foamCap);
-
-        const puffPositions: [number, number, number, number][] = lowPower
-          ? [
-              [0, 1.1, 0, 1.18],
-              [0.16, 1.07, 0.08, 0.88],
-              [-0.15, 1.08, -0.05, 0.92],
-            ]
-          : [
-              [0, 1.1, 0, 1.15],
-              [0.16, 1.07, 0.08, 0.85],
-              [-0.15, 1.08, 0.09, 0.9],
-              [0.05, 1.06, -0.16, 0.88],
-              [-0.12, 1.05, -0.12, 0.8],
-            ];
-        for (const [px, py, pz, ps] of puffPositions) {
-          const puff = makeMesh(geoBeerFoamPuff, matBeerFoam, false, 2);
-          puff.position.set(px, py, pz);
-          puff.scale.setScalar(ps);
-          root.add(puff);
-        }
-
-        const mug = makeMesh(geoBeerMug, matHeavyCrystal, true, 3);
-        root.add(mug);
-
-        const handle = makeMesh(geoBeerHandle, matHeavyCrystal, true, 3);
-        root.add(handle);
-
-        const bandLow = makeMesh(geoBeerBand, matBrushedBrass, false, 4);
-        bandLow.rotation.x = Math.PI / 2;
-        bandLow.position.y = 0.18;
-        root.add(bandLow);
-        break;
-      }
-
-      case 'shot': {
-        const baseSlug = makeMesh(geoShotBaseSlug, matHeavyCrystal, false, 1);
-        baseSlug.position.y = 0.095;
-        root.add(baseSlug);
-
-        const liquid = makeMesh(geoShotLiquid, matSpiritLiquid, false, 2);
-        liquid.position.y = 0.38;
-        root.add(liquid);
-
-        const glass = makeMesh(geoShotGlass, matHeavyCrystal, true, 3);
-        root.add(glass);
-
-        const goldRim = makeMesh(geoShotGoldRim, matBrushedBrass, false, 4);
-        goldRim.rotation.x = Math.PI / 2;
-        goldRim.position.y = 0.68;
-        root.add(goldRim);
-
-        // Slight scale boost so shot glass reads boldly down the track
-        root.scale.setScalar(1.25);
-        break;
-      }
-
-      case 'napkin': {
-        const base = makeMesh(geoNapkinBase, matNapkinLinen);
-        base.position.y = 0.03;
-        root.add(base);
-
-        const centerFold = makeMesh(geoNapkinCone, matNapkinLinen);
-        centerFold.position.y = 0.52;
-        centerFold.rotation.y = Math.PI / 4;
-        root.add(centerFold);
-
-        const leftWing = makeMesh(geoNapkinWing, matNapkinLinen);
-        leftWing.position.set(-0.14, 0.48, 0.04);
-        leftWing.rotation.set(0.08, 0.5, 0.24);
-        root.add(leftWing);
-
-        const rightWing = makeMesh(geoNapkinWing, matNapkinLinen);
-        rightWing.position.set(0.14, 0.48, -0.04);
-        rightWing.rotation.set(-0.08, -0.5, -0.24);
-        root.add(rightWing);
-
-        const ring = makeMesh(geoNapkinRing, matBrushedBrass);
-        ring.rotation.x = Math.PI / 2;
-        ring.position.y = 0.34;
-        root.add(ring);
-
-        const ribbon = makeMesh(geoNapkinRibbon, matCrimsonRibbon, false);
-        ribbon.rotation.x = Math.PI / 2;
-        ribbon.position.y = 0.34;
-        root.add(ribbon);
-        break;
-      }
-
-      case 'wine': {
-        const bottle = makeMesh(geoWineBottle, matWineBottleGlass);
-        root.add(bottle);
-
-        const foil = makeMesh(geoWineFoil, matWineFoil);
-        foil.position.y = 1.41;
-        root.add(foil);
-
-        const foilCap = makeMesh(geoWineFoilCap, matWineFoil);
-        foilCap.position.y = 1.565;
-        root.add(foilCap);
-
-        const neckCollar = makeMesh(geoWineNeckCollar, matBrushedBrass, false);
-        neckCollar.rotation.x = Math.PI / 2;
-        neckCollar.position.y = 1.27;
-        root.add(neckCollar);
-
-        const cork = makeMesh(geoWineCork, matCork);
-        cork.position.y = 1.62;
-        root.add(cork);
-
-        const label = makeMesh(geoWineLabel, matWineLabel, false);
-        label.position.y = 0.48;
-        label.rotation.y = 0; // faces +Z toward player camera
-        root.add(label);
-
-        root.scale.setScalar(0.86);
-        break;
+      } else if (col % 2 === 0) {
+        clothLayers.push({
+          shape: roundedRect(cx, cy, 0.22, 0.2, 0.015),
+          color: C.clothPink,
+          depthRank: 1,
+        });
       }
     }
+  }
+  // Fold flap accent across top edge
+  clothLayers.push({
+    shape: roundedRect(0, 0.96, 1.04, 0.11, 0.03),
+    color: C.redDark,
+    depthRank: 2,
+  });
+  clothLayers.push({
+    shape: roundedRect(0, 0.16, 1.04, 0.07, 0.02),
+    color: C.gold,
+    depthRank: 2,
+  });
 
+  const bpCloth = buildBlueprint(clothOutline, clothLayers, { scale: 0.96 });
+
+  // =========================================================================
+  // 5. PLATE (Talíř) — Bold concentric vector porcelain plate with gold crest
+  // =========================================================================
+  const plateOutline = circleShape(0, 0.62, 0.64);
+  const bpPlate = buildBlueprint(
+    plateOutline,
+    [
+      { shape: circleShape(0, 0.62, 0.56), color: C.cream, depthRank: 0, curveSegs: 20 },
+      { shape: circleShape(0, 0.62, 0.5), color: C.gold, depthRank: 1, curveSegs: 20 },
+      { shape: circleShape(0, 0.62, 0.45), color: C.white, depthRank: 2, curveSegs: 20 },
+      { shape: circleShape(0, 0.62, 0.34), color: C.creamShade, depthRank: 3, curveSegs: 18 },
+      { shape: circleShape(0, 0.62, 0.3), color: C.cream, depthRank: 4, curveSegs: 18 },
+      // Center arcade diamond crest
+      {
+        shape: polyShape([
+          [0, 0.76],
+          [0.14, 0.62],
+          [0, 0.48],
+          [-0.14, 0.62],
+        ]),
+        color: C.red,
+        depthRank: 5,
+      },
+      { shape: circleShape(0, 0.62, 0.055), color: C.gold, depthRank: 6, curveSegs: 10 },
+    ],
+    { outlineSegs: 22, scale: 0.98 },
+  );
+
+  // =========================================================================
+  // 6. WATER GLASS (Sklenice s vodou) — Opaque cyan vector tumbler + lemon
+  // =========================================================================
+  const waterOutline = polyShape([
+    [-0.36, 0.0],
+    [0.36, 0.0],
+    [0.46, 1.18],
+    [0.58, 1.24],
+    [0.52, 1.44],
+    [0.24, 1.42],
+    [0.16, 1.24],
+    [-0.46, 1.24],
+  ]);
+  const waterGlassBody = polyShape([
+    [-0.29, 0.08],
+    [0.29, 0.08],
+    [0.39, 1.16],
+    [-0.39, 1.16],
+  ]);
+  const waterLiquid = polyShape([
+    [-0.25, 0.16],
+    [0.25, 0.16],
+    [0.33, 0.92],
+    [-0.33, 0.92],
+  ]);
+  const waterWave = roundedRect(0, 0.92, 0.66, 0.08, 0.03);
+  const waterStreak = polyShape([
+    [-0.24, 0.22],
+    [-0.15, 0.22],
+    [-0.21, 1.08],
+    [-0.3, 1.08],
+  ]);
+  const bpWater = buildBlueprint(
+    waterOutline,
+    [
+      { shape: waterGlassBody, color: C.waterGlass, depthRank: 0 },
+      { shape: waterLiquid, color: C.waterFill, depthRank: 1 },
+      { shape: waterWave, color: C.waterLight, depthRank: 2 },
+      { shape: roundedRect(-0.08, 0.72, 0.18, 0.18, 0.03), color: C.white, depthRank: 3 },
+      { shape: roundedRect(0.14, 0.64, 0.16, 0.16, 0.03), color: C.waterLight, depthRank: 3 },
+      { shape: waterStreak, color: C.white, depthRank: 4 },
+      { shape: circleShape(0.36, 1.22, 0.2), color: C.lemon, depthRank: 2, curveSegs: 14 },
+      { shape: circleShape(0.36, 1.22, 0.13), color: C.lemonPulp, depthRank: 3, curveSegs: 12 },
+    ],
+    { scale: 0.95 },
+  );
+
+  // =========================================================================
+  // 7. BEER MUG (Sklenice s pivem — Český půllitr) — Opaque golden vector mug
+  // =========================================================================
+  const beerOutline = polyShape([
+    [-0.44, 0.0],
+    [0.4, 0.0],
+    [0.42, 0.26],
+    [0.66, 0.28],
+    [0.68, 0.96],
+    [0.42, 0.98],
+    [0.44, 1.28],
+    [0.24, 1.44],
+    [-0.04, 1.5],
+    [-0.34, 1.42],
+    [-0.46, 1.22],
+  ]);
+  const beerHandleOuter = roundedRect(0.46, 0.62, 0.3, 0.56, 0.1);
+  const beerHandleInner = roundedRect(0.46, 0.62, 0.14, 0.34, 0.05);
+  const bpBeer = buildBlueprint(
+    beerOutline,
+    [
+      { shape: beerHandleOuter, color: C.gold, depthRank: 0 },
+      { shape: beerHandleInner, color: C.outline, depthRank: 1 },
+      { shape: roundedRect(-0.02, 0.56, 0.72, 0.98, 0.06), color: C.beer, depthRank: 1 },
+      // Vertical golden arcade flutes
+      { shape: roundedRect(-0.2, 0.52, 0.11, 0.68, 0.04), color: C.beerBright, depthRank: 2 },
+      { shape: roundedRect(0.0, 0.52, 0.11, 0.68, 0.04), color: C.beerBright, depthRank: 2 },
+      { shape: roundedRect(0.18, 0.52, 0.1, 0.68, 0.04), color: C.beerDark, depthRank: 2 },
+      // Mug base band
+      { shape: roundedRect(-0.02, 0.12, 0.74, 0.12, 0.03), color: C.gold, depthRank: 3 },
+      // Puffy snowy beer foam crown
+      { shape: roundedRect(-0.02, 1.12, 0.76, 0.24, 0.08), color: C.foamShade, depthRank: 3 },
+      { shape: circleShape(-0.22, 1.24, 0.18), color: C.foam, depthRank: 4, curveSegs: 12 },
+      { shape: circleShape(0.0, 1.31, 0.21), color: C.foam, depthRank: 4, curveSegs: 12 },
+      { shape: circleShape(0.22, 1.23, 0.18), color: C.foam, depthRank: 4, curveSegs: 12 },
+    ],
+    { scale: 0.94 },
+  );
+
+  // =========================================================================
+  // 8. SHOT GLASS (Panák) — Thick-base vector shot glass with amber spirit
+  // =========================================================================
+  const shotOutline = polyShape([
+    [-0.36, 0.0],
+    [0.36, 0.0],
+    [0.48, 1.08],
+    [-0.48, 1.08],
+  ]);
+  const shotGlassBody = polyShape([
+    [-0.29, 0.07],
+    [0.29, 0.07],
+    [0.4, 1.0],
+    [-0.4, 1.0],
+  ]);
+  const shotBase = polyShape([
+    [-0.27, 0.09],
+    [0.27, 0.09],
+    [0.3, 0.34],
+    [-0.3, 0.34],
+  ]);
+  const shotLiquid = polyShape([
+    [-0.3, 0.36],
+    [0.3, 0.36],
+    [0.36, 0.84],
+    [-0.36, 0.84],
+  ]);
+  const bpShot = buildBlueprint(
+    shotOutline,
+    [
+      { shape: shotGlassBody, color: C.shotGlass, depthRank: 0 },
+      { shape: shotBase, color: C.white, depthRank: 1 },
+      { shape: shotLiquid, color: C.spirit, depthRank: 1 },
+      { shape: roundedRect(0, 0.84, 0.72, 0.08, 0.02), color: C.spiritLight, depthRank: 2 },
+      { shape: roundedRect(0, 1.0, 0.82, 0.07, 0.02), color: C.gold, depthRank: 3 },
+      { shape: roundedRect(-0.18, 0.58, 0.08, 0.56, 0.03), color: C.white, depthRank: 3 },
+    ],
+    { scale: 1.0 },
+  );
+
+  // =========================================================================
+  // 9. NAPKIN (Ubrousek) — 3-peak crown folded vector napkin + crimson/gold ring
+  // =========================================================================
+  const napkinOutline = polyShape([
+    [-0.46, 0.0],
+    [0.46, 0.0],
+    [0.54, 1.12],
+    [0.24, 0.92],
+    [0.0, 1.4],
+    [-0.24, 0.92],
+    [-0.54, 1.12],
+  ]);
+  const napkinLeftWing = polyShape([
+    [-0.38, 0.1],
+    [-0.04, 0.1],
+    [-0.14, 0.86],
+    [-0.45, 1.02],
+  ]);
+  const napkinRightWing = polyShape([
+    [0.04, 0.1],
+    [0.38, 0.1],
+    [0.45, 1.02],
+    [0.14, 0.86],
+  ]);
+  const napkinCenterPeak = polyShape([
+    [-0.28, 0.1],
+    [0.28, 0.1],
+    [0.0, 1.28],
+  ]);
+  const bpNapkin = buildBlueprint(
+    napkinOutline,
+    [
+      { shape: napkinLeftWing, color: C.creamShade, depthRank: 0 },
+      { shape: napkinRightWing, color: C.creamShade, depthRank: 0 },
+      { shape: napkinCenterPeak, color: C.cream, depthRank: 1 },
+      { shape: roundedRect(0, 0.44, 0.78, 0.16, 0.04), color: C.gold, depthRank: 2 },
+      { shape: roundedRect(0, 0.44, 0.72, 0.07, 0.02), color: C.red, depthRank: 3 },
+      { shape: roundedRect(0, 0.1, 0.76, 0.07, 0.02), color: C.goldDark, depthRank: 2 },
+    ],
+    { scale: 0.96 },
+  );
+
+  // =========================================================================
+  // 10. WINE BOTTLE (Láhev vína) — Tall emerald vector bottle + vintage label
+  // =========================================================================
+  const wineOutline = polyShape([
+    [-0.36, 0.0],
+    [0.36, 0.0],
+    [0.36, 0.94],
+    [0.18, 1.18],
+    [0.18, 1.64],
+    [-0.18, 1.64],
+    [-0.18, 1.18],
+    [-0.36, 0.94],
+  ]);
+  const wineBody = polyShape([
+    [-0.29, 0.07],
+    [0.29, 0.07],
+    [0.29, 0.92],
+    [0.11, 1.16],
+    [0.11, 1.54],
+    [-0.11, 1.54],
+    [-0.11, 1.16],
+    [-0.29, 0.92],
+  ]);
+  const wineShade = polyShape([
+    [0.08, 0.08],
+    [0.29, 0.08],
+    [0.29, 0.92],
+    [0.11, 1.15],
+    [0.08, 1.15],
+  ]);
+  const bpWine = buildBlueprint(
+    wineOutline,
+    [
+      { shape: wineBody, color: C.wineGreen, depthRank: 0 },
+      { shape: wineShade, color: C.wineDark, depthRank: 1 },
+      { shape: roundedRect(-0.18, 0.56, 0.07, 0.66, 0.03), color: C.wineLight, depthRank: 2 },
+      // Burgundy foil & cork
+      { shape: roundedRect(0, 1.38, 0.24, 0.3, 0.03), color: C.wineFoil, depthRank: 2 },
+      { shape: roundedRect(0, 1.57, 0.2, 0.1, 0.02), color: C.cork, depthRank: 3 },
+      { shape: roundedRect(0, 1.24, 0.26, 0.06, 0.02), color: C.gold, depthRank: 3 },
+      // Vintage cream label + crimson crest bar
+      { shape: roundedRect(0, 0.52, 0.54, 0.42, 0.03), color: C.cream, depthRank: 3 },
+      { shape: roundedRect(0, 0.58, 0.44, 0.1, 0.02), color: C.wineFoil, depthRank: 4 },
+      { shape: roundedRect(0, 0.42, 0.36, 0.06, 0.02), color: C.goldDark, depthRank: 4 },
+    ],
+    { scale: 0.9 },
+  );
+
+  const BLUEPRINTS: Record<ItemType, VectorTokenBlueprint> = {
+    knife: bpKnife,
+    fork: bpFork,
+    spoon: bpSpoon,
+    cloth: bpCloth,
+    plate: bpPlate,
+    water: bpWater,
+    beer: bpBeer,
+    shot: bpShot,
+    napkin: bpNapkin,
+    wine: bpWine,
+  };
+
+  const outlineMat = flatMat(C.outline);
+
+  function createItemMesh(type: ItemType): THREE.Group {
+    const bp = BLUEPRINTS[type];
+    const root = new THREE.Group();
+
+    // Solid dark vector contour body (3D arcade slab with zero shading/shadows)
+    const slab = new THREE.Mesh(bp.slabGeo, outlineMat);
+    slab.position.y = bp.yOffset;
+    root.add(slab);
+
+    // Crisp flat vector color layers on both front (+Z) and back (-Z) faces
+    for (let i = 0; i < bp.layers.length; i++) {
+      const layer = bp.layers[i];
+
+      const front = new THREE.Mesh(layer.geo, layer.mat);
+      front.position.set(0, bp.yOffset, layer.zOffset);
+      root.add(front);
+
+      const back = new THREE.Mesh(layer.geo, layer.mat);
+      back.position.set(0, bp.yOffset, -layer.zOffset);
+      back.rotation.y = Math.PI;
+      root.add(back);
+    }
+
+    root.scale.setScalar(bp.scale);
     return root;
   }
 

@@ -10,17 +10,15 @@ interface GameHudProps {
   onPause: () => void;
 }
 
-const JUDGEMENT_CONFIG: Record<HitJudgement, { label: string; color: string }> = {
-  perfect: { label: 'PERFEKTNÍ', color: '#ffd269' },
-  great: { label: 'SKVĚLÉ', color: '#5be0a0' },
-  good: { label: 'DOBRÉ', color: '#78d5ec' },
-  miss: { label: 'MINUTO', color: '#f06464' },
+const JUDGEMENT_CONFIG: Record<HitJudgement, { label: string; color: string; bg: string }> = {
+  perfect: { label: 'PERFEKTNÍ', color: '#0b0a16', bg: '#ffd166' },
+  great: { label: 'SKVĚLÉ', color: '#0b0a16', bg: '#06d6a0' },
+  good: { label: 'DOBRÉ', color: '#0b0a16', bg: '#38bdf8' },
+  miss: { label: 'MINUTO', color: '#ffffff', bg: '#ff3b6b' },
 };
 
 /**
- * Low-occlusion perimeter HUD during active play.
- * Keeps >85% of the 3D rhythm track unobstructed, uses solid/rgba panels
- * (no backdrop-filter over WebGL), tabular numerals, and zero pulsing dots.
+ * Crisp opaque flat-vector arcade perimeter HUD (zero shadows, zero transparency).
  */
 export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPause }) => {
   const level = getLevelById(hud.levelId);
@@ -29,38 +27,38 @@ export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPa
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 select-none">
-      {/* Mobile Compact Top Utility Row (< md) — sits cleanly above TopSymbolBar with zero overlap */}
+      {/* Mobile Compact Top Utility Row (< md) — solid opaque arcade bar above TopSymbolBar */}
       <div className="md:hidden fixed top-[max(8px,env(safe-area-inset-top))] left-2 right-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5 rounded-lg border border-[#f5efe6]/12 bg-[#16110e]/90 px-2.5 py-1.5 min-w-0">
+        <div className="flex items-center gap-2.5 rounded-lg border-2 border-[#38bdf8] bg-[#141229] px-2.5 py-1.5 min-w-0">
           <div className="leading-none">
-            <div className="text-[10px] text-[#b5a592]">Skóre</div>
-            <div className="font-mono-tabular text-base font-bold text-[#fff7e8]">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#94a3b8]">Skóre</div>
+            <div className="font-mono-tabular text-base font-bold text-[#ffffff]">
               {hud.score.toLocaleString('cs-CZ')}
             </div>
           </div>
-          <div className="h-6 w-px bg-[#f5efe6]/12" aria-hidden="true" />
-          <div className="font-mono-tabular text-[11px] leading-tight text-[#c7b9a6]">
+          <div className="h-6 w-0.5 bg-[#2d2858]" aria-hidden="true" />
+          <div className="font-mono-tabular text-[11px] leading-tight text-[#cbd5e1]">
             <div>×{hud.combo}</div>
-            <div className={hud.multiplier > 1 ? 'text-[#ffd269] font-bold' : 'text-[#8e8070]'}>
+            <div className={hud.multiplier > 1 ? 'text-[#ffd166] font-bold' : 'text-[#94a3b8]'}>
               {hud.multiplier}×
             </div>
           </div>
         </div>
 
         {/* Compact mobile tempo bar */}
-        <div className="flex-1 max-w-[132px] rounded-lg border border-[#f5efe6]/12 bg-[#16110e]/90 px-2.5 py-1.5">
+        <div className="flex-1 max-w-[132px] rounded-lg border-2 border-[#2d2858] bg-[#141229] px-2.5 py-1.5">
           <div className="flex items-center justify-between text-[10px] mb-1 leading-none">
-            <span className={tempoDanger ? 'text-[#f06464] font-semibold' : 'text-[#b5a592]'}>
-              {tempoDanger ? 'Pozor!' : 'Tempo'}
+            <span className={tempoDanger ? 'text-[#ff3b6b] font-bold' : 'text-[#cbd5e1] font-semibold'}>
+              {tempoDanger ? 'POZOR!' : 'TEMPO'}
             </span>
-            <span className="font-mono-tabular text-[#f5efe6] font-medium">{hud.tempoIntegrity}%</span>
+            <span className="font-mono-tabular text-[#ffffff] font-bold">{hud.tempoIntegrity}%</span>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-[#2a211b] overflow-hidden">
+          <div className="h-2 w-full rounded bg-[#26224a] overflow-hidden">
             <div
-              className="h-full rounded-full transition-[width] duration-150"
+              className="h-full transition-[width] duration-150"
               style={{
                 width: `${hud.tempoIntegrity}%`,
-                backgroundColor: tempoDanger ? '#e05252' : hud.tempoIntegrity > 65 ? '#e2b86b' : '#e8964a',
+                backgroundColor: tempoDanger ? '#ff3b6b' : hud.tempoIntegrity > 65 ? '#06d6a0' : '#ff9f1c',
               }}
             />
           </div>
@@ -70,16 +68,16 @@ export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPa
           <button
             type="button"
             onClick={onToggleMute}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-lg border border-[#f5efe6]/14 bg-[#16110e]/92 text-[#f5efe6] active:bg-[#281f19] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd269]"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-lg border-2 border-[#3a346e] bg-[#141229] text-[#ffffff] active:bg-[#242048] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd166]"
             aria-label={muted ? 'Zapnout zvuk' : 'Ztlumit zvuk'}
           >
-            {muted ? <VolumeX className="w-4 h-4 text-[#e05252]" /> : <Volume2 className="w-4 h-4 text-[#e2b86b]" />}
+            {muted ? <VolumeX className="w-4 h-4 text-[#ff3b6b]" /> : <Volume2 className="w-4 h-4 text-[#ffd166]" />}
           </button>
 
           <button
             type="button"
             onClick={onPause}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-lg border border-[#f5efe6]/14 bg-[#16110e]/92 text-[#f5efe6] active:bg-[#281f19] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd269]"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-lg border-2 border-[#3a346e] bg-[#141229] text-[#ffffff] active:bg-[#242048] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd166]"
             aria-label="Pozastavit hru"
           >
             <Pause className="w-4 h-4" />
@@ -89,34 +87,34 @@ export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPa
 
       {/* Desktop Top-Left Perimeter Cluster (md+): Score, Combo & Tempo Integrity */}
       <div className="hidden md:flex fixed top-4 left-4 flex-col gap-2">
-        <div className="rounded-lg border border-[#f5efe6]/12 bg-[#16110e]/88 px-3.5 py-2.5 min-w-[154px]">
-          <div className="text-[11px] font-medium text-[#b5a592] leading-tight">Skóre</div>
-          <div className="font-mono-tabular text-2xl font-bold text-[#fff7e8] leading-tight">
+        <div className="rounded-lg border-2 border-[#38bdf8] bg-[#141229] px-3.5 py-2.5 min-w-[160px]">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[#94a3b8] leading-tight">Skóre</div>
+          <div className="font-mono-tabular text-2xl font-bold text-[#ffffff] leading-tight">
             {hud.score.toLocaleString('cs-CZ')}
           </div>
-          <div className="mt-1.5 flex items-center gap-2 text-xs text-[#c7b9a6] font-mono-tabular">
+          <div className="mt-1.5 flex items-center gap-2 text-xs text-[#cbd5e1] font-mono-tabular">
             <span>Kombo {hud.combo}</span>
-            <span aria-hidden="true" className="text-[#6b5d4e]">·</span>
-            <span className={hud.multiplier > 1 ? 'text-[#ffd269] font-bold' : ''}>
+            <span aria-hidden="true" className="text-[#64748b]">·</span>
+            <span className={hud.multiplier > 1 ? 'text-[#ffd166] font-bold' : ''}>
               {hud.multiplier}×
             </span>
           </div>
         </div>
 
         {/* Tempo integrity meter */}
-        <div className="rounded-lg border border-[#f5efe6]/12 bg-[#16110e]/88 px-3.5 py-2 min-w-[154px]">
+        <div className="rounded-lg border-2 border-[#2d2858] bg-[#141229] px-3.5 py-2 min-w-[160px]">
           <div className="flex items-center justify-between text-[11px] mb-1">
-            <span className={tempoDanger ? 'text-[#f06464] font-semibold' : 'text-[#b5a592]'}>
-              {tempoDanger ? 'Pozor na tempo' : 'Tempo servisu'}
+            <span className={tempoDanger ? 'text-[#ff3b6b] font-bold' : 'text-[#cbd5e1] font-semibold'}>
+              {tempoDanger ? 'Pozor na tempo!' : 'Tempo servisu'}
             </span>
-            <span className="font-mono-tabular text-[#f5efe6] font-medium">{hud.tempoIntegrity}%</span>
+            <span className="font-mono-tabular text-[#ffffff] font-bold">{hud.tempoIntegrity}%</span>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-[#2a211b] overflow-hidden">
+          <div className="h-2 w-full rounded bg-[#26224a] overflow-hidden">
             <div
-              className="h-full rounded-full transition-[width] duration-150"
+              className="h-full transition-[width] duration-150"
               style={{
                 width: `${hud.tempoIntegrity}%`,
-                backgroundColor: tempoDanger ? '#e05252' : hud.tempoIntegrity > 65 ? '#e2b86b' : '#e8964a',
+                backgroundColor: tempoDanger ? '#ff3b6b' : hud.tempoIntegrity > 65 ? '#06d6a0' : '#ff9f1c',
               }}
             />
           </div>
@@ -125,11 +123,11 @@ export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPa
 
       {/* Desktop Top-Right Perimeter Cluster (md+): Level info & Mute/Pause controls */}
       <div className="hidden md:flex fixed top-4 right-4 items-start gap-2">
-        <div className="flex flex-col items-end rounded-lg border border-[#f5efe6]/12 bg-[#16110e]/88 px-3.5 py-2 text-right">
-          <span className="text-xs font-semibold text-[#f5efe6] whitespace-nowrap">
+        <div className="flex flex-col items-end rounded-lg border-2 border-[#2d2858] bg-[#141229] px-3.5 py-2 text-right">
+          <span className="text-xs font-bold text-[#ffffff] whitespace-nowrap">
             {String(level.id).padStart(2, '0')}. {level.name}
           </span>
-          <span className="text-[11px] text-[#b5a592] font-mono-tabular whitespace-nowrap">
+          <span className="text-[11px] text-[#94a3b8] font-mono-tabular whitespace-nowrap">
             {level.bpm} BPM · {hud.accuracy}% přesnost
           </span>
         </div>
@@ -137,17 +135,17 @@ export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPa
         <button
           type="button"
           onClick={onToggleMute}
-          className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-lg border border-[#f5efe6]/14 bg-[#16110e]/90 text-[#f5efe6] hover:bg-[#281f19] hover:border-[#e2b86b]/50 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd269]"
+          className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-lg border-2 border-[#3a346e] bg-[#141229] text-[#ffffff] hover:bg-[#242048] hover:border-[#ffd166] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd166]"
           aria-label={muted ? 'Zapnout zvuk' : 'Ztlumit zvuk'}
           title={muted ? 'Zapnout zvuk (M)' : 'Ztlumit zvuk (M)'}
         >
-          {muted ? <VolumeX className="w-4 h-4 text-[#e05252]" /> : <Volume2 className="w-4 h-4 text-[#e2b86b]" />}
+          {muted ? <VolumeX className="w-4 h-4 text-[#ff3b6b]" /> : <Volume2 className="w-4 h-4 text-[#ffd166]" />}
         </button>
 
         <button
           type="button"
           onClick={onPause}
-          className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-lg border border-[#f5efe6]/14 bg-[#16110e]/90 text-[#f5efe6] hover:bg-[#281f19] hover:border-[#e2b86b]/50 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd269]"
+          className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-lg border-2 border-[#3a346e] bg-[#141229] text-[#ffffff] hover:bg-[#242048] hover:border-[#ffd166] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd166]"
           aria-label="Pozastavit hru"
           title="Pauza (Esc)"
         >
@@ -155,31 +153,31 @@ export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPa
         </button>
       </div>
 
-      {/* Transient Beat Hit Judgement Feedback (positioned cleanly below TopSymbolBar) */}
+      {/* Solid Opaque Arcade Beat Hit Judgement Feedback */}
       {judgeCfg && hud.judgementSeq > 0 && (
         <div
           key={hud.judgementSeq}
-          className="animate-judgement fixed top-[calc(max(8px,env(safe-area-inset-top))+134px)] md:top-[132px] left-1/2 flex flex-col items-center pointer-events-none"
+          className="animate-judgement fixed top-[calc(max(8px,env(safe-area-inset-top))+136px)] md:top-[132px] left-1/2 flex flex-col items-center pointer-events-none"
         >
           <span
-            className="font-display text-lg sm:text-2xl font-bold tracking-wide drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]"
-            style={{ color: judgeCfg.color }}
+            className="rounded-md border-2 border-[#090814] px-3 py-0.5 font-mono-tabular text-sm sm:text-base font-extrabold tracking-wider"
+            style={{ backgroundColor: judgeCfg.bg, color: judgeCfg.color }}
           >
             {judgeCfg.label}
           </span>
           {hud.lastJudgementPoints > 0 && (
-            <span className="font-mono-tabular text-xs font-bold text-[#fff5dc] drop-shadow-[0_1px_6px_rgba(0,0,0,0.9)]">
+            <span className="mt-1 rounded bg-[#141229] border border-[#ffd166] px-2 py-0.5 font-mono-tabular text-[11px] font-bold text-[#ffd166]">
               +{hud.lastJudgementPoints}
-              {hud.lastJudgementIsUnique ? ' · Unikátní nota' : ''}
+              {hud.lastJudgementIsUnique ? ' · 2×' : ''}
             </span>
           )}
         </div>
       )}
 
-      {/* Subtle Bottom Progress Hairline */}
-      <div className="fixed bottom-0 left-0 right-0 h-1 bg-[#1f1813]">
+      {/* Solid Bottom Progress Bar */}
+      <div className="fixed bottom-0 left-0 right-0 h-1.5 bg-[#1b1738]">
         <div
-          className="h-full bg-[#e2b86b]"
+          className="h-full bg-[#ffd166]"
           style={{ width: `${Math.round(hud.progress * 100)}%` }}
         />
       </div>

@@ -35,15 +35,15 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
     <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between px-3.5 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))] sm:p-7">
       {/* Top Row: Bespoke SVG Brand Lockup (left) + Install & Audio Controls (right) */}
       <div className="flex items-start justify-between gap-2.5 sm:gap-4">
-        <div className="pointer-events-auto max-w-md rounded-xl border border-[#e2b86b]/20 bg-[#16110e]/88 px-3.5 py-3 sm:px-5 sm:py-4">
+        <div className="pointer-events-auto max-w-md rounded-xl border-2 border-[#ffd166] bg-[#141229] px-3.5 py-3 sm:px-5 sm:py-4">
           <div className="flex items-center gap-3 sm:gap-3.5">
             <TitleEmblem className="w-9 h-9 sm:w-11 sm:h-11 shrink-0" />
             <div>
-              <h1 className="font-display text-xl sm:text-3xl font-bold tracking-tight text-[#fff7e8] leading-none">
+              <h1 className="font-display text-xl sm:text-3xl font-bold tracking-tight text-[#ffffff] leading-none">
                 Rytmus Stolu
               </h1>
-              <p className="mt-1 sm:mt-1.5 text-[11px] sm:text-sm text-[#c7b9a6] leading-snug">
-                3D rytmický servis v taktu hudby · 10 unikátních předmětů
+              <p className="mt-1 sm:mt-1.5 text-[11px] sm:text-sm text-[#cbd5e1] leading-snug">
+                Arkádový rytmický servis · 10 vektorových předmětů
               </p>
             </div>
           </div>
@@ -55,11 +55,11 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           <button
             type="button"
             onClick={onToggleMute}
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-lg border border-[#f5efe6]/15 bg-[#16110e]/88 text-[#f5efe6] hover:border-[#e2b86b]/55 hover:bg-[#241b16] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd269]"
+            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-lg border-2 border-[#3a346e] bg-[#141229] text-[#ffffff] hover:border-[#ffd166] hover:bg-[#242048] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ffd166]"
             aria-label={muted ? 'Zapnout zvuk' : 'Ztlumit zvuk'}
             title={muted ? 'Zapnout zvuk (M)' : 'Ztlumit zvuk (M)'}
           >
-            {muted ? <VolumeX className="w-5 h-5 text-[#e05252]" /> : <Volume2 className="w-5 h-5 text-[#e2b86b]" />}
+            {muted ? <VolumeX className="w-5 h-5 text-[#ff3b6b]" /> : <Volume2 className="w-5 h-5 text-[#ffd166]" />}
           </button>
         </div>
       </div>
@@ -67,17 +67,17 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
       {/* Bottom Dock: Selected Level Action + Compact 10-Level Selector Strip */}
       <div className="pointer-events-auto mx-auto w-full max-w-[1060px] flex flex-col gap-2 sm:gap-3">
         {/* Selected level summary & dominant Start CTA */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 rounded-xl border border-[#e2b86b]/24 bg-[#16110e]/92 px-3.5 py-3 sm:px-5 sm:py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 rounded-xl border-2 border-[#38bdf8] bg-[#141229] px-3.5 py-3 sm:px-5 sm:py-4">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <div
-              className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg border border-[#e2b86b]/35 bg-[#241b15]"
+              className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg border-2 border-[#ffd166] bg-[#221d42]"
               style={{ color: uniqueItemDef.accentHex }}
             >
               <ItemIcon item={activeLevel.uniqueItem} className="w-6 h-6 sm:w-7 sm:h-7" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-[#b5a592] whitespace-nowrap">
-                <span className="font-mono-tabular text-[#e2b86b] font-semibold">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-[#cbd5e1] whitespace-nowrap">
+                <span className="font-mono-tabular text-[#ffd166] font-bold">
                   Úroveň {String(activeLevel.id).padStart(2, '0')} / 10
                 </span>
                 <span aria-hidden="true">·</span>
@@ -85,10 +85,10 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                 <span aria-hidden="true">·</span>
                 <span className="font-mono-tabular">{activeLevel.bpm} BPM</span>
               </div>
-              <h2 className="font-display text-lg sm:text-2xl font-bold text-[#fff7e8] truncate">
+              <h2 className="font-display text-lg sm:text-2xl font-bold text-[#ffffff] truncate">
                 {activeLevel.name}
               </h2>
-              <p className="text-[11px] sm:text-sm text-[#b5a592] truncate">
+              <p className="text-[11px] sm:text-sm text-[#94a3b8] truncate">
                 {activeLevel.subtitle} · {uniqueItemDef.soundCharacter}
                 {levelStats ? ` · Rekord ${levelStats.bestScore.toLocaleString('cs-CZ')}` : ''}
               </p>
@@ -98,15 +98,15 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           <button
             type="button"
             onClick={() => onStartLevel(activeLevel.id)}
-            className="flex items-center justify-center gap-2.5 rounded-lg bg-[#d99b38] hover:bg-[#e7ac4c] active:scale-[0.98] px-5 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-bold text-[#140f0b] transition-all cursor-pointer whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#fff7e8]"
+            className="flex items-center justify-center gap-2.5 rounded-lg border-2 border-[#ffffff] bg-[#ffd166] hover:bg-[#ffe08a] active:scale-[0.98] px-5 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-extrabold text-[#0b0a16] transition-all cursor-pointer whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#ffffff]"
           >
             <Play className="w-4 h-4 fill-current" />
             <span>Hrát úroveň</span>
           </button>
         </div>
 
-        {/* 10-Level Selector Strip (all 10 tableware items immediately selectable) */}
-        <div className="rounded-xl border border-[#f5efe6]/12 bg-[#140f0c]/92 p-1.5 sm:p-2.5">
+        {/* 10-Level Selector Strip (all 10 vector tableware items immediately selectable) */}
+        <div className="rounded-xl border-2 border-[#2d2858] bg-[#141229] p-1.5 sm:p-2.5">
           <div className="level-scroll grid grid-cols-5 lg:grid-cols-10 gap-1 sm:gap-1.5 overflow-x-auto">
             {LEVELS.map((lvl) => {
               const isSelected = lvl.id === activeLevel.id;
@@ -119,14 +119,14 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                   key={lvl.id}
                   type="button"
                   onClick={() => onSelectLevel(lvl.id)}
-                  className={`flex flex-col items-center justify-between rounded-lg border px-1 py-1.5 sm:px-1.5 sm:py-2 transition-colors cursor-pointer min-h-[62px] sm:min-h-[76px] focus-visible:outline-2 focus-visible:outline-[#ffd269] ${
+                  className={`flex flex-col items-center justify-between rounded-lg border-2 px-1 py-1.5 sm:px-1.5 sm:py-2 transition-colors cursor-pointer min-h-[62px] sm:min-h-[76px] focus-visible:outline-2 focus-visible:outline-[#ffd166] ${
                     isSelected
-                      ? 'border-[#e2b86b] bg-[#2a1f16] text-[#fff7e8]'
-                      : 'border-[#f5efe6]/8 bg-[#1b1511] text-[#b5a592] hover:bg-[#241c17] hover:text-[#f5efe6]'
+                      ? 'border-[#ffd166] bg-[#2a2457] text-[#ffffff]'
+                      : 'border-[#26224a] bg-[#1a1736] text-[#94a3b8] hover:border-[#38bdf8] hover:bg-[#221d45] hover:text-[#ffffff]'
                   }`}
                 >
                   <div className="w-full flex items-center justify-between px-0.5 text-[9px] sm:text-[10px] font-mono-tabular">
-                    <span className={isSelected ? 'text-[#e2b86b] font-bold' : 'text-[#7c6f60]'}>
+                    <span className={isSelected ? 'text-[#ffd166] font-bold' : 'text-[#64748b]'}>
                       {String(lvl.id).padStart(2, '0')}
                     </span>
                     <span className="flex items-center gap-0.5" aria-label={`${stars} ze 3 hvězd`}>
@@ -134,18 +134,18 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                         <Star
                           key={s}
                           className={`w-2 h-2 sm:w-2.5 sm:h-2.5 ${
-                            s <= stars ? 'text-[#ffd269] fill-[#ffd269]' : 'text-[#42372e]'
+                            s <= stars ? 'text-[#ffd166] fill-[#ffd166]' : 'text-[#332d5e]'
                           }`}
                         />
                       ))}
                     </span>
                   </div>
 
-                  <div className="my-0.5 sm:my-1" style={{ color: isSelected ? itemDef.accentHex : '#cbbca9' }}>
+                  <div className="my-0.5 sm:my-1" style={{ color: isSelected ? itemDef.accentHex : '#cbd5e1' }}>
                     <ItemIcon item={lvl.uniqueItem} className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
 
-                  <span className="w-full text-center text-[10px] sm:text-[11px] font-medium tracking-tight truncate whitespace-nowrap">
+                  <span className="w-full text-center text-[10px] sm:text-[11px] font-bold tracking-tight truncate whitespace-nowrap">
                     {itemDef.shortName}
                   </span>
                 </button>
@@ -155,7 +155,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         </div>
 
         {/* Single flat control-hint line */}
-        <p className="text-center text-[11px] sm:text-xs text-[#a89885] tracking-wide">
+        <p className="text-center text-[11px] sm:text-xs font-medium text-[#94a3b8] tracking-wide">
           <span className="sm:hidden">Klepněte na dlaždici nebo na symboly nahoře v rytmu</span>
           <span className="hidden sm:inline">
             D · F · J · K (nebo 1–4) nebo klik na symboly nahoře · Enter Start · Esc Pauza · M Zvuk
