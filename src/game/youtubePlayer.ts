@@ -113,6 +113,7 @@ export class YouTubeMusicController {
   private muted = false;
   private volume = 72;
   private currentVideoId: string | null = null;
+  private currentStartSeconds = 0;
   private pendingPlay: { videoId: string; startSeconds: number; loop: boolean } | null = null;
   private pendingCue: { videoId: string; startSeconds: number } | null = null;
   private loopCurrent = true;
@@ -213,7 +214,10 @@ export class YouTubeMusicController {
               this.setState('paused');
             } else if (e.data === PS.ENDED) {
               if (this.loopCurrent && this.currentVideoId && this.player) {
-                this.player.loadVideoById({ videoId: this.currentVideoId, startSeconds: 0 });
+                this.player.loadVideoById({
+                  videoId: this.currentVideoId,
+                  startSeconds: this.currentStartSeconds,
+                });
               } else {
                 this.setState('idle');
               }
@@ -230,6 +234,7 @@ export class YouTubeMusicController {
 
   public cueTrack(videoId: string, startSeconds = 0): void {
     this.currentVideoId = videoId;
+    this.currentStartSeconds = startSeconds;
     if (!this.ready || !this.player) {
       this.pendingCue = { videoId, startSeconds };
       return;
@@ -243,6 +248,7 @@ export class YouTubeMusicController {
 
   public playTrack(videoId: string, startSeconds = 0, loop = true): void {
     this.currentVideoId = videoId;
+    this.currentStartSeconds = startSeconds;
     this.loopCurrent = loop;
     this.pendingCue = null;
 

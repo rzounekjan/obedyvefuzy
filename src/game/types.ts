@@ -14,19 +14,19 @@ export type HitJudgement = 'perfect' | 'great' | 'good' | 'miss';
 
 export type GamePhase = 'title' | 'playing' | 'paused' | 'victory' | 'gameover';
 
-export type MusicStyle = 'dnb' | 'disco' | 'rnb';
+export type MusicStyle = 'dubstep' | 'disco' | 'rnb';
 
 export type MusicTrackId =
-  | 'dnb-pulse'
-  | 'dnb-liquid'
-  | 'dnb-arcade'
-  | 'dnb-skyline'
-  | 'disco-sunday'
-  | 'disco-climax'
-  | 'disco-funk'
-  | 'rnb-smooth'
-  | 'rnb-aesthetic'
-  | 'rnb-groove';
+  | 'rnb-heartbreak'
+  | 'rnb-raindrops'
+  | 'rnb-cant-do'
+  | 'disco-beach'
+  | 'disco-funky'
+  | 'disco-ultralounge'
+  | 'dubstep-blank'
+  | 'dubstep-bensound'
+  | 'dubstep-savage'
+  | 'dubstep-falling';
 
 export type SciFiSfxMode = 'laser' | 'plasma' | 'photon';
 

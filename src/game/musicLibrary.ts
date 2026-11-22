@@ -1,24 +1,25 @@
 import type { MusicTrack, MusicTrackId } from './types';
 
 /**
- * 10 verified, embeddable YouTube Audio Library tracks strictly across 3 genres
- * (R&B, Diskotéka, Drum & Bass), sorted ascending by BPM from 70 BPM (#1) to 160 BPM (#10)
- * in exact +10 BPM steps.
+ * 10 brand-new verified, embeddable YouTube music tracks strictly across 3 genres
+ * (R&B, Diskotéka, Dubstep), sorted ascending by BPM from 70 BPM (#1) to 160 BPM (#10)
+ * in exact +10 BPM steps. Every track uses a tuned startSeconds offset so playback
+ * drops straight into active music with zero quiet intro.
  */
 export const MUSIC_TRACKS: readonly MusicTrack[] = [
   // --- R&B (slowest: 70–90 BPM) ---
   {
-    id: 'rnb-aesthetic',
+    id: 'rnb-heartbreak',
     index: 1,
     style: 'rnb',
     styleLabel: 'R&B',
-    genre: 'R&B · Neo-Soul',
+    genre: 'R&B · Soul',
     shortGenre: 'R&B Soul',
-    title: 'Aesthetic R&B',
-    artist: 'JJO Vibes',
+    title: 'Heart Break',
+    artist: 'Vibe Tracks',
     sourceLabel: 'YouTube Audio Library',
-    youtubeId: 'S6nzbsO59uE',
-    startSeconds: 0,
+    youtubeId: 'YVCGk0340D0',
+    startSeconds: 8,
     bpm: 70,
     accentHex: '#c084fc',
     rootMidi: 65, // F min7
@@ -33,17 +34,17 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
     sfxDescription: 'Hluboká plazma & jemný laser',
   },
   {
-    id: 'rnb-smooth',
+    id: 'rnb-raindrops',
     index: 2,
     style: 'rnb',
     styleLabel: 'R&B',
-    genre: 'R&B · Smooth',
-    shortGenre: 'R&B Smooth',
-    title: 'Nice To You',
-    artist: 'Audio Library',
+    genre: 'R&B · Chill',
+    shortGenre: 'R&B Chill',
+    title: 'Rain Drops',
+    artist: 'TrackTribe',
     sourceLabel: 'YouTube Audio Library',
-    youtubeId: 'rLUWs_w_jyE',
-    startSeconds: 0,
+    youtubeId: 'gDsFeG7bA0E',
+    startSeconds: 10,
     bpm: 80,
     accentHex: '#a78bfa',
     rootMidi: 60, // C maj7
@@ -58,17 +59,17 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
     sfxDescription: 'Hladký fotonový puls & plazma',
   },
   {
-    id: 'rnb-groove',
+    id: 'rnb-cant-do',
     index: 3,
     style: 'rnb',
     styleLabel: 'R&B',
     genre: 'R&B · Groove',
     shortGenre: 'R&B Groove',
-    title: "Time For Movin' On",
-    artist: 'Audio Library',
+    title: "Can't Do Nothing Right",
+    artist: 'Filo Starquez',
     sourceLabel: 'YouTube Audio Library',
-    youtubeId: 'UnFGb_o6BNY',
-    startSeconds: 0,
+    youtubeId: 'ci9Adj4gYs0',
+    startSeconds: 12,
     bpm: 90,
     accentHex: '#e879f9',
     rootMidi: 64, // E min7
@@ -85,17 +86,17 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
 
   // --- DISKOTÉKA / DISCO (medium: 100–120 BPM) ---
   {
-    id: 'disco-sunday',
+    id: 'disco-beach',
     index: 4,
     style: 'disco',
     styleLabel: 'Diskotéka',
-    genre: 'Diskotéka · Nu-Disco',
-    shortGenre: 'Disko Nu',
-    title: 'Disco Sunday',
-    artist: 'Audio Library Beats',
+    genre: 'Diskotéka · Retro',
+    shortGenre: 'Disko Retro',
+    title: 'Beach Disco',
+    artist: 'Dougie Wood',
     sourceLabel: 'YouTube Audio Library',
-    youtubeId: 'bayHm7ioBT4',
-    startSeconds: 0,
+    youtubeId: 'QWr71apyDmI',
+    startSeconds: 6,
     bpm: 100,
     accentHex: '#ffd166',
     rootMidi: 67, // G major
@@ -110,17 +111,17 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
     sfxDescription: 'Neon plazma & laserový puls',
   },
   {
-    id: 'disco-funk',
+    id: 'disco-funky',
     index: 5,
     style: 'disco',
     styleLabel: 'Diskotéka',
     genre: 'Diskotéka · Funky',
     shortGenre: 'Disko Funk',
-    title: "Dancin'",
-    artist: 'Alex Menco',
+    title: 'Funky Disco',
+    artist: 'Biz Baz Studio',
     sourceLabel: 'YouTube Audio Library',
-    youtubeId: 'DO3oCDN0fJ8',
-    startSeconds: 0,
+    youtubeId: '8nqhDZ7aqus',
+    startSeconds: 4,
     bpm: 110,
     accentHex: '#ff9f1c',
     rootMidi: 60, // C major
@@ -135,17 +136,17 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
     sfxDescription: 'Fotonový výboj & laserový čep',
   },
   {
-    id: 'disco-climax',
+    id: 'disco-ultralounge',
     index: 6,
     style: 'disco',
     styleLabel: 'Diskotéka',
     genre: 'Diskotéka · Club',
     shortGenre: 'Disko Club',
-    title: 'Disco Climax',
-    artist: 'An Jone',
+    title: 'Disco Ultralounge',
+    artist: 'Kevin MacLeod',
     sourceLabel: 'YouTube Audio Library',
-    youtubeId: 'S4d7B5VmFw8',
-    startSeconds: 0,
+    youtubeId: '0Ria5e0OeyM',
+    startSeconds: 8,
     bpm: 120,
     accentHex: '#ff2a85',
     rootMidi: 62, // D minor
@@ -160,19 +161,19 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
     sfxDescription: 'Klubový sci-fi laser & plazma',
   },
 
-  // --- DRUM & BASS (fastest: 130–160 BPM) ---
+  // --- DUBSTEP (fastest: 130–160 BPM) ---
   {
-    id: 'dnb-liquid',
+    id: 'dubstep-blank',
     index: 7,
-    style: 'dnb',
-    styleLabel: 'Drum & Bass',
-    genre: 'Drum & Bass · Liquid',
-    shortGenre: 'DnB Liquid',
-    title: 'Crystal Horizon',
-    artist: 'Audio Library',
-    sourceLabel: 'YouTube Audio Library',
-    youtubeId: 'Y3KyS8KFMC0',
-    startSeconds: 0,
+    style: 'dubstep',
+    styleLabel: 'Dubstep',
+    genre: 'Dubstep · Melodic',
+    shortGenre: 'Dubstep',
+    title: 'Blank',
+    artist: 'Disfigure',
+    sourceLabel: 'YouTube NCS Library',
+    youtubeId: 'p7ZsBPK656s',
+    startSeconds: 28,
     bpm: 130,
     accentHex: '#38bdf8',
     rootMidi: 65, // F minor
@@ -187,17 +188,17 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
     sfxDescription: 'Fotonový paprsek & iontový záblesk',
   },
   {
-    id: 'dnb-arcade',
+    id: 'dubstep-bensound',
     index: 8,
-    style: 'dnb',
-    styleLabel: 'Drum & Bass',
-    genre: 'Drum & Bass · Arcade',
-    shortGenre: 'DnB Arcade',
-    title: 'Video Game DnB',
-    artist: 'Haze Library',
+    style: 'dubstep',
+    styleLabel: 'Dubstep',
+    genre: 'Dubstep · Bass',
+    shortGenre: 'Dubstep',
+    title: 'Dubstep',
+    artist: 'Benjamin Tissot',
     sourceLabel: 'YouTube Audio Library',
-    youtubeId: 'ALZnmJZsfKA',
-    startSeconds: 0,
+    youtubeId: 'bpIW1423FX0',
+    startSeconds: 14,
     bpm: 140,
     accentHex: '#06d6a0',
     rootMidi: 69, // A minor
@@ -212,17 +213,17 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
     sfxDescription: 'Plazmový výboj & cyber laser',
   },
   {
-    id: 'dnb-pulse',
+    id: 'dubstep-savage',
     index: 9,
-    style: 'dnb',
-    styleLabel: 'Drum & Bass',
-    genre: 'Drum & Bass · Pulse',
-    shortGenre: 'DnB Pulse',
-    title: 'Drum & Bass',
-    artist: 'Andrew Huang',
-    sourceLabel: 'YouTube Audio Library',
-    youtubeId: 'y1tI4UyHWSs',
-    startSeconds: 0,
+    style: 'dubstep',
+    styleLabel: 'Dubstep',
+    genre: 'Dubstep · Heavy',
+    shortGenre: 'Dubstep',
+    title: 'Savage',
+    artist: 'Paul Flint',
+    sourceLabel: 'YouTube NCS Library',
+    youtubeId: '8uSx3DyJjk0',
+    startSeconds: 26,
     bpm: 150,
     accentHex: '#22d3ee',
     rootMidi: 67, // G minor
@@ -237,17 +238,17 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
     sfxDescription: 'Sci-fi laser & plazmový impuls',
   },
   {
-    id: 'dnb-skyline',
+    id: 'dubstep-falling',
     index: 10,
-    style: 'dnb',
-    styleLabel: 'Drum & Bass',
-    genre: 'Drum & Bass · Uplift',
-    shortGenre: 'DnB Uplift',
-    title: 'Skyline',
-    artist: 'Audioscribe',
-    sourceLabel: 'YouTube Audio Library',
-    youtubeId: 'LUOAtNq3Pp0',
-    startSeconds: 0,
+    style: 'dubstep',
+    styleLabel: 'Dubstep',
+    genre: 'Dubstep · Hyper',
+    shortGenre: 'Dubstep',
+    title: 'Falling 4 U',
+    artist: 'ROY KNOX',
+    sourceLabel: 'YouTube NCS Library',
+    youtubeId: '4KBQIPdqm68',
+    startSeconds: 32,
     bpm: 160,
     accentHex: '#34d399',
     rootMidi: 63, // Eb major
@@ -263,7 +264,7 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
   },
 ];
 
-export const DEFAULT_MUSIC_TRACK_ID: MusicTrackId = 'rnb-aesthetic';
+export const DEFAULT_MUSIC_TRACK_ID: MusicTrackId = 'rnb-heartbreak';
 
 export function getMusicTrackById(id: MusicTrackId): MusicTrack {
   return MUSIC_TRACKS.find((t) => t.id === id) ?? MUSIC_TRACKS[0];

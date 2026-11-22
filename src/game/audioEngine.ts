@@ -7,8 +7,8 @@ function midiToFreq(midi: number): number {
 }
 
 /**
- * Hybrid YouTube Audio Library (Drum & Bass / Diskotéka / R&B) + Modern Sci-Fi SFX Engine.
- * - Streams any of the 10 curated DnB, Disco, and R&B tracks from the YouTube Audio Library.
+ * Hybrid YouTube Audio Library (R&B / Diskotéka / Dubstep) + Modern Sci-Fi SFX Engine.
+ * - Streams any of the 10 curated R&B, Disco, and Dubstep tracks starting directly in the music.
  * - Maintains a rock-solid Web Audio beat clock & style-matched offline fallback groove
  *   (auto-ducks to 0 when YouTube audio enters PLAYING).
  * - Synthesizes crisp, modern sci-fi laser, plasma pulse, and photon beam hit sounds
@@ -227,7 +227,7 @@ export class RhythmAudioEngine {
   }
 
   /**
-   * Offline / buffering fallback grooves strictly tailored to Drum & Bass, Diskotéka, and R&B.
+   * Offline / buffering fallback grooves strictly tailored to R&B, Diskotéka, and Dubstep.
    */
   private scheduleFallbackGrooveStep(eighthStep: number, time: number, track: MusicTrack): void {
     if (!this.ctx || !this.musicGain) return;
@@ -237,19 +237,20 @@ export class RhythmAudioEngine {
     const chord = track.chordProgression[barIndex % track.chordProgression.length];
     const style: MusicStyle = track.style;
 
-    if (style === 'dnb') {
-      // Classic 2-step Drum & Bass breakbeat (kick on 1 and 2.5, punchy snare on 2 and 4)
-      if ((!isOffbeat && beatInBar === 0) || (isOffbeat && beatInBar === 2)) {
-        this.playKick(time, 0.58);
+    if (style === 'dubstep') {
+      // Heavy half-time Dubstep beat (sub kick on 1 & 3.5, huge snare on 3) + wobble bass from beat 0
+      if ((!isOffbeat && beatInBar === 0) || (isOffbeat && beatInBar === 3)) {
+        this.playKick(time, 0.64);
       }
-      if (!isOffbeat && (beatInBar === 1 || beatInBar === 3)) {
-        this.playModernSnare(time, 0.36);
+      if (!isOffbeat && beatInBar === 2) {
+        this.playModernSnare(time, 0.44);
       }
-      // Rolling high-energy DnB hats
-      this.playHiHat(time, isOffbeat ? 0.14 : 0.08);
+      this.playHiHat(time, isOffbeat ? 0.13 : 0.07);
+      if (!isOffbeat && (beatInBar === 0 || beatInBar === 2)) {
+        this.playDubstepWobbleBass(time, midiToFreq(chord[0] - 12), (60 / track.bpm) * 1.9, track.bpm);
+      }
       if (!isOffbeat && beatInBar === 0) {
-        this.playBass(time, midiToFreq(chord[0] - 12), (60 / track.bpm) * 1.8, 'dnb');
-        this.playChordPad(time, chord, (60 / track.bpm) * 1.8, 0.14);
+        this.playChordPad(time, chord, (60 / track.bpm) * 1.6, 0.12);
       }
     } else if (style === 'disco') {
       // Four-on-the-floor Diskotéka groove + offbeat open hat + funky octave bass
@@ -345,16 +346,52 @@ export class RhythmAudioEngine {
     src.stop(time + 0.05);
   }
 
+  private playDubstepWobbleBass(time: number, freq: number, duration: number, bpm: number): void {
+    if (!this.ctx || !this.musicGain) return;
+    const osc = this.ctx.createOscillator();
+    const lfo = this.ctx.createOscillator();
+    const lfoGain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, time);
+
+    filter.type = 'lowpass';
+    filter.Q.value = 6.0;
+    filter.frequency.setValueAtTime(480, time);
+
+    // Rhythmic wobble synced to track BPM (3 wobbles per beat)
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime((bpm / 60) * 2, time);
+    lfoGain.gain.setValueAtTime(380, time);
+
+    gain.gain.setValueAtTime(0.001, time);
+    gain.gain.linearRampToValueAtTime(0.34, time + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(filter.frequency);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.musicGain);
+
+    lfo.start(time);
+    osc.start(time);
+    lfo.stop(time + duration + 0.02);
+    osc.stop(time + duration + 0.02);
+  }
+
   private playBass(time: number, freq: number, duration: number, style: MusicStyle): void {
     if (!this.ctx || !this.musicGain) return;
     const osc = this.ctx.createOscillator();
     const filter = this.ctx.createBiquadFilter();
     const gain = this.ctx.createGain();
 
-    osc.type = style === 'dnb' ? 'sawtooth' : 'triangle';
+    osc.type = style === 'dubstep' ? 'sawtooth' : 'triangle';
     osc.frequency.setValueAtTime(freq, time);
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(style === 'dnb' ? 540 : style === 'disco' ? 620 : 340, time);
+    filter.frequency.setValueAtTime(style === 'dubstep' ? 540 : style === 'disco' ? 620 : 340, time);
 
     gain.gain.setValueAtTime(0.001, time);
     gain.gain.linearRampToValueAtTime(0.32, time + 0.012);
