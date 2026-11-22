@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Disc3, Music, Play, Square, Star, Utensils, Volume2, VolumeX } from 'lucide-react';
+import { Disc3, Gauge, Music, Play, Square, Star, Utensils, Volume2, VolumeX } from 'lucide-react';
 import { ITEMS, LEVELS } from '../game/levels';
 import { getMusicTrackById, MUSIC_TRACKS } from '../game/musicLibrary';
 import type { MusicTrackId, ProgressMap } from '../game/types';
@@ -54,10 +54,10 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
             <TitleEmblem className="w-9 h-9 sm:w-11 sm:h-11 shrink-0" />
             <div>
               <h1 className="font-display text-xl sm:text-3xl font-bold tracking-tight text-[#ffffff] leading-none">
-                Rytmus Stolu
+                FUZEDY
               </h1>
               <p className="mt-1 sm:mt-1.5 text-[11px] sm:text-sm text-[#cbd5e1] leading-snug">
-                Arkádový servis · Drum &amp; Bass · Diskotéka · R&amp;B
+                Obědy ve FUZy
               </p>
             </div>
           </div>
@@ -157,7 +157,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         {/* Switchable 10-Level / 10-Music Selector Dock */}
         <div className="rounded-xl border-2 border-[#2d2858] bg-[#141229] p-1.5 sm:p-2.5">
           {/* Crisp 2-Tab Selector Header */}
-          <div className="grid grid-cols-2 gap-1.5 mb-1.5 sm:mb-2" role="tablist" aria-label="Výběr úrovně nebo hudby">
+          <div className="grid grid-cols-2 gap-1.5 mb-1.5 sm:mb-2" role="tablist" aria-label="Výběr úrovně nebo rychlosti">
             <button
               type="button"
               role="tab"
@@ -184,8 +184,8 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                   : 'border-[#26224a] bg-[#1a1736] text-[#94a3b8] hover:border-[#38bdf8] hover:text-[#ffffff]'
               }`}
             >
-              <Music className="w-3.5 h-3.5 shrink-0" style={{ color: activeTrack.accentHex }} />
-              <span className="truncate">Hudba (DnB · Disko · R&amp;B)</span>
+              <Gauge className="w-3.5 h-3.5 shrink-0" style={{ color: activeTrack.accentHex }} />
+              <span className="truncate">Rychlost · {activeTrack.bpm} BPM</span>
             </button>
           </div>
 
@@ -237,7 +237,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               })}
             </div>
           ) : (
-            /* 10-Style YouTube Audio Library Rhythmic Music Grid */
+            /* 10-Step Speed / BPM Selector Grid (01 = 70 BPM .. 10 = 160 BPM) */
             <div className="flex flex-col gap-1.5">
               <div className="level-scroll grid grid-cols-5 lg:grid-cols-10 gap-1 sm:gap-1.5 overflow-x-auto">
                 {MUSIC_TRACKS.map((track) => {
@@ -262,35 +262,38 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                         >
                           {String(track.index).padStart(2, '0')}
                         </span>
-                        <span className={isSelected ? 'text-[#ffffff] font-bold' : 'text-[#64748b]'}>
-                          {track.bpm}
+                        <span className={isSelected ? 'text-[#ffd166] font-bold' : 'text-[#64748b]'}>
+                          BPM
                         </span>
                       </div>
 
-                      <div className="my-0.5 sm:my-1" style={{ color: isSelected ? track.accentHex : '#cbd5e1' }}>
-                        <Music className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <div
+                        className="my-0.5 font-mono-tabular text-sm sm:text-base font-extrabold leading-none"
+                        style={{ color: isSelected ? track.accentHex : '#ffffff' }}
+                      >
+                        {track.bpm}
                       </div>
 
-                      <span className="w-full text-center text-[10px] sm:text-[11px] font-bold tracking-tight truncate whitespace-nowrap">
-                        {track.shortGenre}
+                      <span className="w-full text-center text-[9px] sm:text-[10px] font-bold tracking-tight truncate whitespace-nowrap">
+                        {track.styleLabel}
                       </span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Active YouTube Audio Library Track Metadata Bar */}
+              {/* Active Speed & YouTube Audio Library Track Bar */}
               <div className="flex items-center justify-between gap-2 rounded-lg border border-[#2d2858] bg-[#1a1736] px-2.5 py-1.5 text-[11px] sm:text-xs text-[#cbd5e1]">
                 <span className="truncate">
-                  <strong className="text-[#38bdf8]">{activeTrack.sourceLabel}</strong>
+                  <strong className="text-[#ffd166]">Rychlost {String(activeTrack.index).padStart(2, '0')}</strong>
                   {' · '}
-                  <strong className="text-[#ffffff]">{activeTrack.title}</strong>
-                  {' ('}
-                  {activeTrack.artist}
-                  {') · '}
-                  <span className="text-[#94a3b8]">{activeTrack.sfxDescription}</span>
+                  <strong className="text-[#ffffff]">{activeTrack.genre}</strong>
+                  {' · '}
+                  {activeTrack.artist} – {activeTrack.title}
+                  {' · '}
+                  <span className="text-[#94a3b8]">{activeTrack.sourceLabel}</span>
                 </span>
-                <span className="font-mono-tabular font-bold text-[#ffd166] shrink-0">
+                <span className="font-mono-tabular font-bold text-[#38bdf8] shrink-0">
                   {activeTrack.bpm} BPM
                 </span>
               </div>

@@ -330,7 +330,7 @@ export default function App() {
       <div
         ref={canvasMountRef}
         className="absolute inset-0 h-full w-full"
-        aria-label="3D herní dráha Rytmus Stolu"
+        aria-label="3D herní dráha FUZEDY"
       />
 
       {/* Title Screen Overlay */}

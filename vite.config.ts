@@ -21,13 +21,13 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
+        includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
         manifest: {
           id: base,
-          name: 'Rytmus Stolu',
-          short_name: 'Rytmus Stolu',
+          name: 'FUZEDY',
+          short_name: 'FUZEDY',
           description:
-            '3D rytmická hra ve stylu Magic Tiles se stolním servisem, deseti unikátními předměty a efekty v rytmu hudby.',
+            'Obědy ve FUZy — 3D rytmická hra ve stylu Magic Tiles se stolním servisem, deseti unikátními předměty a efekty v rytmu hudby.',
           lang: 'cs',
           theme_color: '#0b0a16',
           background_color: '#0b0a16',
