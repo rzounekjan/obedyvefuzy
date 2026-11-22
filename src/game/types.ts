@@ -12,6 +12,22 @@ export type ItemType =
 
 export type HitJudgement = 'perfect' | 'great' | 'good' | 'miss';
 
+export type CalloutTone = 'positive' | 'negative';
+
+export type ServiceCalloutKind =
+  | 'super-service'
+  | 'best'
+  | 'bad-service'
+  | 'manager'
+  | 'fired-warning';
+
+export interface ServiceCallout {
+  kind: ServiceCalloutKind;
+  label: string;
+  tone: CalloutTone;
+  seq: number;
+}
+
 export type GamePhase = 'title' | 'playing' | 'paused' | 'victory' | 'gameover';
 
 export type MusicStyle = 'dubstep' | 'disco' | 'rnb';
@@ -135,6 +151,7 @@ export interface HudSnapshot {
   lastJudgementIsUnique: boolean;
   lastJudgementPoints: number;
   judgementSeq: number;
+  serviceCallout: ServiceCallout | null;
   lanePrompts: [LanePrompt, LanePrompt, LanePrompt, LanePrompt];
   stats: HitStats;
   accuracy: number; // 0..100

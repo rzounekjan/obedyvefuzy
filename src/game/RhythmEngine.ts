@@ -14,6 +14,7 @@ import type {
   MusicTrack,
   MusicTrackId,
   NoteEvent,
+  ServiceCallout,
 } from './types';
 
 // --- Track Layout Constants ---
@@ -189,6 +190,11 @@ export class RhythmEngine {
   private lastJudgementIsUnique = false;
   private lastJudgementPoints = 0;
   private judgementSeq = 0;
+  private hitStreak = 0;
+  private missStreak = 0;
+  private wasTempoBelow30 = false;
+  private serviceCallout: ServiceCallout | null = null;
+  private calloutSeq = 0;
   private laneFlashKind: (HitJudgement | null)[] = [null, null, null, null];
   private laneFlashSeq: number[] = [0, 0, 0, 0];
   private laneFlashTimer: number[] = [0, 0, 0, 0];
@@ -648,6 +654,10 @@ export class RhythmEngine {
     this.lastJudgement = null;
     this.lastJudgementIsUnique = false;
     this.lastJudgementPoints = 0;
+    this.hitStreak = 0;
+    this.missStreak = 0;
+    this.wasTempoBelow30 = false;
+    this.serviceCallout = null;
     this.lastBeatInt = -1;
     this.currentBeat = 0;
     this.cameraShake = 0;
@@ -743,11 +753,34 @@ export class RhythmEngine {
 
       this.combo += 1;
       if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+      this.missStreak = 0;
+      this.hitStreak += 1;
       const mult = this.getMultiplier();
       const gained = basePts * mult;
       this.score += gained;
       this.tempoIntegrity = Math.min(100, this.tempoIntegrity + healthGain);
+      if (this.tempoIntegrity >= 30) {
+        this.wasTempoBelow30 = false;
+      }
       this.stats[judgement] += 1;
+
+      if (this.hitStreak >= 6 && this.hitStreak % 6 === 0) {
+        this.calloutSeq += 1;
+        this.serviceCallout = {
+          kind: 'best',
+          label: 'JSI NEJLEPŠÍ',
+          tone: 'positive',
+          seq: this.calloutSeq,
+        };
+      } else if (this.hitStreak % 3 === 0) {
+        this.calloutSeq += 1;
+        this.serviceCallout = {
+          kind: 'super-service',
+          label: 'SUPER SERVIS',
+          tone: 'positive',
+          seq: this.calloutSeq,
+        };
+      }
 
       this.lastJudgement = judgement;
       this.lastJudgementIsUnique = bestNote.isUnique;
@@ -794,8 +827,41 @@ export class RhythmEngine {
 
   private registerMiss(lane: 0 | 1 | 2 | 3, fromPassedNote: boolean): void {
     this.combo = 0;
+    this.hitStreak = 0;
+    this.missStreak += 1;
     this.stats.miss += 1;
     this.tempoIntegrity = Math.max(0, this.tempoIntegrity - (fromPassedNote ? 12 : 7));
+
+    const droppedBelow30 = this.tempoIntegrity > 0 && this.tempoIntegrity < 30 && !this.wasTempoBelow30;
+    if (this.tempoIntegrity < 30) {
+      this.wasTempoBelow30 = true;
+    }
+
+    if (droppedBelow30) {
+      this.calloutSeq += 1;
+      this.serviceCallout = {
+        kind: 'fired-warning',
+        label: 'DOSTANEŠ PADÁKA',
+        tone: 'negative',
+        seq: this.calloutSeq,
+      };
+    } else if (this.tempoIntegrity > 0 && this.missStreak >= 6 && this.missStreak % 6 === 0) {
+      this.calloutSeq += 1;
+      this.serviceCallout = {
+        kind: 'manager',
+        label: 'JDE PO TOBĚ MANAŽER',
+        tone: 'negative',
+        seq: this.calloutSeq,
+      };
+    } else if (this.tempoIntegrity > 0 && this.missStreak % 3 === 0) {
+      this.calloutSeq += 1;
+      this.serviceCallout = {
+        kind: 'bad-service',
+        label: 'ŠPATNÝ SERVIS',
+        tone: 'negative',
+        seq: this.calloutSeq,
+      };
+    }
 
     this.lastJudgement = 'miss';
     this.lastJudgementIsUnique = false;
@@ -1390,6 +1456,7 @@ export class RhythmEngine {
       lastJudgementIsUnique: this.lastJudgementIsUnique,
       lastJudgementPoints: this.lastJudgementPoints,
       judgementSeq: this.judgementSeq,
+      serviceCallout: this.serviceCallout ? { ...this.serviceCallout } : null,
       lanePrompts: prompts as [LanePrompt, LanePrompt, LanePrompt, LanePrompt],
       stats: { ...this.stats },
       accuracy,

@@ -1,8 +1,18 @@
 import React from 'react';
-import { Pause, Volume2, VolumeX } from 'lucide-react';
+import {
+  AlertTriangle,
+  Crown,
+  Flame,
+  Pause,
+  Sparkles,
+  UserX,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { getLevelById } from '../game/levels';
 import { getMusicTrackById } from '../game/musicLibrary';
-import type { HitJudgement, HudSnapshot } from '../game/types';
+import type { HitJudgement, HudSnapshot, ServiceCalloutKind } from '../game/types';
+import { ServiceBurstEffect } from './ServiceBurstEffect';
 
 interface GameHudProps {
   hud: HudSnapshot;
@@ -17,6 +27,58 @@ const JUDGEMENT_CONFIG: Record<HitJudgement, { label: string; color: string; bg:
   good: { label: 'DOBRÉ', color: '#0b0a16', bg: '#38bdf8' },
   miss: { label: 'MINUTO', color: '#ffffff', bg: '#ff3b6b' },
 };
+
+const CALLOUT_STYLE: Record<
+  ServiceCalloutKind,
+  { bg: string; border: string; text: string; iconColor: string }
+> = {
+  'super-service': {
+    bg: '#0d2b26',
+    border: '#06d6a0',
+    text: '#ffffff',
+    iconColor: '#06d6a0',
+  },
+  best: {
+    bg: '#2c2008',
+    border: '#ffd166',
+    text: '#ffd166',
+    iconColor: '#ffd166',
+  },
+  'bad-service': {
+    bg: '#2b0d17',
+    border: '#ff3b6b',
+    text: '#ffffff',
+    iconColor: '#ff6b00',
+  },
+  manager: {
+    bg: '#2b0d0a',
+    border: '#ff6b00',
+    text: '#ffd166',
+    iconColor: '#ff3b6b',
+  },
+  'fired-warning': {
+    bg: '#380912',
+    border: '#ff2a00',
+    text: '#ffffff',
+    iconColor: '#ffd166',
+  },
+};
+
+function renderCalloutIcon(kind: ServiceCalloutKind, color: string): React.ReactNode {
+  const cls = 'w-5 h-5 sm:w-6 sm:h-6 shrink-0';
+  switch (kind) {
+    case 'super-service':
+      return <Sparkles className={cls} style={{ color }} />;
+    case 'best':
+      return <Crown className={cls} style={{ color }} />;
+    case 'bad-service':
+      return <AlertTriangle className={cls} style={{ color }} />;
+    case 'manager':
+      return <UserX className={cls} style={{ color }} />;
+    case 'fired-warning':
+      return <Flame className={cls} style={{ color }} />;
+  }
+}
 
 /**
  * Crisp opaque flat-vector arcade perimeter HUD (zero shadows, zero transparency).
@@ -173,6 +235,42 @@ export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPa
               {hud.lastJudgementIsUnique ? ' · 2×' : ''}
             </span>
           )}
+        </div>
+      )}
+
+      {/* Exploding Service Streak & Tempo Warning Indicator (Confetti / Fire) */}
+      {hud.serviceCallout && (
+        <div
+          key={hud.serviceCallout.seq}
+          className={`fixed top-[calc(max(8px,env(safe-area-inset-top))+118px)] md:top-[78px] left-1/2 z-20 pointer-events-none ${
+            hud.serviceCallout.tone === 'positive'
+              ? 'animate-callout-positive'
+              : 'animate-callout-negative'
+          }`}
+        >
+          <div className="relative flex items-center justify-center">
+            <ServiceBurstEffect
+              tone={hud.serviceCallout.tone}
+              burstKey={hud.serviceCallout.seq}
+              scale={1}
+            />
+            <div
+              className="relative z-10 flex items-center gap-2 rounded-xl border-2 px-4 py-2 whitespace-nowrap"
+              style={{
+                backgroundColor: CALLOUT_STYLE[hud.serviceCallout.kind].bg,
+                borderColor: CALLOUT_STYLE[hud.serviceCallout.kind].border,
+                color: CALLOUT_STYLE[hud.serviceCallout.kind].text,
+              }}
+            >
+              {renderCalloutIcon(
+                hud.serviceCallout.kind,
+                CALLOUT_STYLE[hud.serviceCallout.kind].iconColor,
+              )}
+              <span className="font-display text-sm sm:text-lg font-extrabold tracking-wide uppercase">
+                {hud.serviceCallout.label}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 

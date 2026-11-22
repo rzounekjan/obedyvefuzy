@@ -74,6 +74,7 @@ function createInitialHud(trackId: MusicTrackId): HudSnapshot {
     lastJudgementIsUnique: false,
     lastJudgementPoints: 0,
     judgementSeq: 0,
+    serviceCallout: null,
     lanePrompts: [
       { lane: 0, item: lvl.laneItems[0], isUnique: true, proximity: 0, inHitWindow: false, isNextRow: false, hasNote: false, flashKind: null, flashSeq: 0 },
       { lane: 1, item: lvl.laneItems[1], isUnique: false, proximity: 0, inHitWindow: false, isNextRow: false, hasNote: false, flashKind: null, flashSeq: 0 },
