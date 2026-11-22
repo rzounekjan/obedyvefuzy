@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, Home, Play, RotateCcw, Star } from 'lucide-react';
 import { getLevelById, ITEMS, LEVELS } from '../game/levels';
+import { getMusicTrackById } from '../game/musicLibrary';
 import type { HudSnapshot } from '../game/types';
 import { ItemIcon } from './ItemIcons';
 
@@ -26,6 +27,7 @@ export const GameModals: React.FC<GameModalsProps> = ({
   if (hud.phase === 'title' || hud.phase === 'playing') return null;
 
   const level = getLevelById(hud.levelId);
+  const track = getMusicTrackById(hud.musicTrackId);
   const uniqueDef = ITEMS[level.uniqueItem];
   const hasNextLevel = level.id < LEVELS.length;
 
@@ -45,8 +47,8 @@ export const GameModals: React.FC<GameModalsProps> = ({
             <ItemIcon item={level.uniqueItem} className="w-7 h-7" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs text-[#94a3b8] font-mono-tabular">
-              Úroveň {String(level.id).padStart(2, '0')} · {level.name}
+            <div className="text-xs text-[#94a3b8] font-mono-tabular truncate">
+              Úroveň {String(level.id).padStart(2, '0')} · {level.name} · {track.genre}
             </div>
             <h2 className="font-display text-2xl font-bold text-[#ffffff]">
               {hud.phase === 'paused'

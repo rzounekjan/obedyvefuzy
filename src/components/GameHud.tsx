@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pause, Volume2, VolumeX } from 'lucide-react';
 import { getLevelById } from '../game/levels';
+import { getMusicTrackById } from '../game/musicLibrary';
 import type { HitJudgement, HudSnapshot } from '../game/types';
 
 interface GameHudProps {
@@ -22,6 +23,7 @@ const JUDGEMENT_CONFIG: Record<HitJudgement, { label: string; color: string; bg:
  */
 export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPause }) => {
   const level = getLevelById(hud.levelId);
+  const track = getMusicTrackById(hud.musicTrackId);
   const judgeCfg = hud.lastJudgement ? JUDGEMENT_CONFIG[hud.lastJudgement] : null;
   const tempoDanger = hud.tempoIntegrity <= 30;
 
@@ -128,7 +130,7 @@ export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPa
             {String(level.id).padStart(2, '0')}. {level.name}
           </span>
           <span className="text-[11px] text-[#94a3b8] font-mono-tabular whitespace-nowrap">
-            {level.bpm} BPM · {hud.accuracy}% přesnost
+            {track.genre} · {hud.bpm} BPM · {hud.accuracy}% přesnost
           </span>
         </div>
 

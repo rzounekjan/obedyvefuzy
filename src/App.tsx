@@ -10,10 +10,12 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { TitleScreen } from './components/TitleScreen';
 import { TopSymbolBar } from './components/TopSymbolBar';
 import { ALT_LANE_KEYS, LANE_KEYS, LEVELS } from './game/levels';
+import { DEFAULT_MUSIC_TRACK_ID, getMusicTrackById, MUSIC_TRACKS } from './game/musicLibrary';
 import { RhythmEngine } from './game/RhythmEngine';
-import type { HudSnapshot, ProgressMap } from './game/types';
+import type { HudSnapshot, MusicTrackId, ProgressMap } from './game/types';
 
 const STORAGE_KEY = 'rytmus_stolu_progress_v1';
+const MUSIC_STORAGE_KEY = 'rytmus_stolu_music_v1';
 
 function loadProgress(): ProgressMap {
   try {
@@ -33,18 +35,40 @@ function saveProgress(map: ProgressMap): void {
   }
 }
 
-function createInitialHud(): HudSnapshot {
+function loadSelectedTrack(): MusicTrackId {
+  try {
+    const raw = window.localStorage.getItem(MUSIC_STORAGE_KEY);
+    if (raw && MUSIC_TRACKS.some((t) => t.id === raw)) {
+      return raw as MusicTrackId;
+    }
+  } catch {
+    // Ignore storage access errors
+  }
+  return DEFAULT_MUSIC_TRACK_ID;
+}
+
+function saveSelectedTrack(trackId: MusicTrackId): void {
+  try {
+    window.localStorage.setItem(MUSIC_STORAGE_KEY, trackId);
+  } catch {
+    // Ignore
+  }
+}
+
+function createInitialHud(trackId: MusicTrackId): HudSnapshot {
   const lvl = LEVELS[0];
+  const track = getMusicTrackById(trackId);
   return {
     phase: 'title',
     levelId: lvl.id,
+    musicTrackId: track.id,
     score: 0,
     combo: 0,
     maxCombo: 0,
     multiplier: 1,
     tempoIntegrity: 100,
     progress: 0,
-    bpm: lvl.bpm,
+    bpm: track.bpm,
     currentBeat: 0,
     beatPulse: 0,
     lastJudgement: null,
@@ -68,8 +92,10 @@ export default function App() {
   const engineRef = useRef<RhythmEngine | null>(null);
   const heldKeysRef = useRef<Set<string>>(new Set());
 
-  const [hud, setHud] = useState<HudSnapshot>(createInitialHud);
   const [selectedLevelId, setSelectedLevelId] = useState<number>(1);
+  const [selectedTrackId, setSelectedTrackId] = useState<MusicTrackId>(loadSelectedTrack);
+  const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
+  const [hud, setHud] = useState<HudSnapshot>(() => createInitialHud(loadSelectedTrack()));
   const [progress, setProgress] = useState<ProgressMap>(loadProgress);
   const [muted, setMuted] = useState<boolean>(false);
 
@@ -78,6 +104,12 @@ export default function App() {
 
   const selectedLevelRef = useRef(selectedLevelId);
   selectedLevelRef.current = selectedLevelId;
+
+  const selectedTrackRef = useRef(selectedTrackId);
+  selectedTrackRef.current = selectedTrackId;
+
+  const isPreviewingRef = useRef(isPreviewing);
+  isPreviewingRef.current = isPreviewing;
 
   // Mount Three.js engine once in isolated ref container so React HUD updates never tear down WebGL
   useEffect(() => {
@@ -106,6 +138,7 @@ export default function App() {
         });
       },
     );
+    engine.setMusicTrack(selectedTrackRef.current);
     engineRef.current = engine;
 
     return () => {
@@ -120,9 +153,33 @@ export default function App() {
     engineRef.current?.setShowcaseLevel(levelId);
   }, []);
 
-  const handleStartLevel = useCallback((levelId: number) => {
+  const handleSelectTrack = useCallback((trackId: MusicTrackId) => {
+    setSelectedTrackId(trackId);
+    saveSelectedTrack(trackId);
+    const track = getMusicTrackById(trackId);
+    engineRef.current?.setMusicTrack(trackId);
+    engineRef.current?.audio.playUiSelect(track.rootMidi);
+    if (isPreviewingRef.current) {
+      engineRef.current?.startMusicPreview(trackId);
+    }
+  }, []);
+
+  const handleTogglePreview = useCallback(() => {
+    if (isPreviewingRef.current) {
+      engineRef.current?.stopMusicPreview();
+      setIsPreviewing(false);
+    } else {
+      engineRef.current?.startMusicPreview(selectedTrackRef.current);
+      setIsPreviewing(true);
+    }
+  }, []);
+
+  const handleStartLevel = useCallback((levelId: number, trackId?: MusicTrackId) => {
+    const resolvedTrack = trackId ?? selectedTrackRef.current;
     setSelectedLevelId(levelId);
-    engineRef.current?.startLevel(levelId);
+    setSelectedTrackId(resolvedTrack);
+    setIsPreviewing(false);
+    engineRef.current?.startLevel(levelId, resolvedTrack);
   }, []);
 
   const handleTriggerLane = useCallback((lane: 0 | 1 | 2 | 3) => {
@@ -144,16 +201,19 @@ export default function App() {
   }, []);
 
   const handleRestart = useCallback(() => {
-    engineRef.current?.startLevel(selectedLevelRef.current);
+    setIsPreviewing(false);
+    engineRef.current?.startLevel(selectedLevelRef.current, selectedTrackRef.current);
   }, []);
 
   const handleNextLevel = useCallback(() => {
     const nextId = Math.min(LEVELS.length, selectedLevelRef.current + 1);
     setSelectedLevelId(nextId);
-    engineRef.current?.startLevel(nextId);
+    setIsPreviewing(false);
+    engineRef.current?.startLevel(nextId, selectedTrackRef.current);
   }, []);
 
   const handleReturnToTitle = useCallback(() => {
+    setIsPreviewing(false);
     engineRef.current?.returnToTitle(selectedLevelRef.current);
   }, []);
 
@@ -176,7 +236,7 @@ export default function App() {
       if (phase === 'title') {
         if (key === 'ENTER' || key === ' ') {
           e.preventDefault();
-          handleStartLevel(selectedLevelRef.current);
+          handleStartLevel(selectedLevelRef.current, selectedTrackRef.current);
         } else if (key === 'ARROWRIGHT') {
           e.preventDefault();
           handleSelectLevel(Math.min(LEVELS.length, selectedLevelRef.current + 1));
@@ -238,6 +298,9 @@ export default function App() {
       heldKeysRef.current.clear();
       if (phaseRef.current === 'playing') {
         handlePause();
+      } else if (isPreviewingRef.current) {
+        engineRef.current?.stopMusicPreview();
+        setIsPreviewing(false);
       }
     };
 
@@ -274,9 +337,13 @@ export default function App() {
       {hud.phase === 'title' && (
         <TitleScreen
           selectedLevelId={selectedLevelId}
+          selectedTrackId={selectedTrackId}
+          isPreviewing={isPreviewing}
           progress={progress}
           muted={muted}
           onSelectLevel={handleSelectLevel}
+          onSelectTrack={handleSelectTrack}
+          onTogglePreview={handleTogglePreview}
           onStartLevel={handleStartLevel}
           onToggleMute={handleToggleMute}
         />

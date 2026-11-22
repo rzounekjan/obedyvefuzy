@@ -14,6 +14,50 @@ export type HitJudgement = 'perfect' | 'great' | 'good' | 'miss';
 
 export type GamePhase = 'title' | 'playing' | 'paused' | 'victory' | 'gameover';
 
+export type MusicTrackId =
+  | 'tropical-house'
+  | 'modern-funk'
+  | 'nu-disco'
+  | 'electro-swing'
+  | 'synthwave'
+  | 'lofi-beat'
+  | 'latin-salsa'
+  | 'future-bass'
+  | 'dark-edm'
+  | 'drum-and-bass';
+
+export type SfxProfileId =
+  | 'tropical'
+  | 'funk'
+  | 'disco'
+  | 'swing'
+  | 'synthwave'
+  | 'lofi'
+  | 'latin'
+  | 'futurebass'
+  | 'darkedm'
+  | 'dnb';
+
+export interface MusicTrack {
+  id: MusicTrackId;
+  index: number;
+  genre: string;
+  shortGenre: string;
+  title: string;
+  artist: string;
+  sourceLabel: string;
+  youtubeId: string;
+  /** Optional start offset in seconds to skip silent intro on YouTube video */
+  startSeconds: number;
+  bpm: number;
+  accentHex: string;
+  rootMidi: number;
+  scaleIntervals: number[];
+  chordProgression: number[][];
+  sfxProfile: SfxProfileId;
+  sfxDescription: string;
+}
+
 export interface ItemDefinition {
   id: ItemType;
   name: string;
@@ -84,6 +128,7 @@ export interface HitStats {
 export interface HudSnapshot {
   phase: GamePhase;
   levelId: number;
+  musicTrackId: MusicTrackId;
   score: number;
   combo: number;
   maxCombo: number;

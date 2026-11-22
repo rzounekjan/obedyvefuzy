@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RhythmAudioEngine } from './audioEngine';
 import { createTablewareModelLibrary, type TablewareModelLibrary } from './itemModels';
 import { generateLevelChart, getLevelById, ITEMS, LEAD_IN_BEATS } from './levels';
+import { DEFAULT_MUSIC_TRACK_ID, getMusicTrackById } from './musicLibrary';
 import type {
   GamePhase,
   HitJudgement,
@@ -10,6 +11,8 @@ import type {
   ItemType,
   LanePrompt,
   LevelDefinition,
+  MusicTrack,
+  MusicTrackId,
   NoteEvent,
 } from './types';
 
@@ -166,6 +169,7 @@ export class RhythmEngine {
   // Game state
   private phase: GamePhase = 'title';
   private currentLevel: LevelDefinition = getLevelById(1);
+  private currentTrack: MusicTrack = getMusicTrackById(DEFAULT_MUSIC_TRACK_ID);
   private notes: NoteEvent[] = [];
   private activeVisuals: Map<number, ActiveTileVisual> = new Map();
   private tilePool: Map<ItemType, ActiveTileVisual[]> = new Map();
@@ -602,13 +606,33 @@ export class RhythmEngine {
     this.emitHud(true);
   }
 
-  public startLevel(levelId: number): void {
+  public setMusicTrack(trackId: MusicTrackId): void {
+    const track = getMusicTrackById(trackId);
+    this.currentTrack = track;
+    this.audio.cueMusicTrack(track);
+    this.emitHud(true);
+  }
+
+  public startMusicPreview(trackId: MusicTrackId): void {
+    const track = getMusicTrackById(trackId);
+    this.currentTrack = track;
+    this.audio.startPreview(track);
+    this.emitHud(true);
+  }
+
+  public stopMusicPreview(): void {
+    this.audio.stopPreview();
+  }
+
+  public startLevel(levelId: number, trackId?: MusicTrackId): void {
     const level = getLevelById(levelId);
+    const track = trackId ? getMusicTrackById(trackId) : this.currentTrack;
     this.currentLevel = level;
+    this.currentTrack = track;
     this.levelAccentColor.setHex(level.accentInt);
     this.clearActiveTiles();
 
-    this.notes = generateLevelChart(level);
+    this.notes = generateLevelChart(level, track);
     this.score = 0;
     this.combo = 0;
     this.maxCombo = 0;
@@ -638,7 +662,7 @@ export class RhythmEngine {
     this.archTrimMat.color.setHex(level.accentInt);
     this.phase = 'playing';
 
-    this.audio.startTrack(level);
+    this.audio.startTrack(level, track);
     this.emitHud(true);
   }
 
@@ -679,7 +703,7 @@ export class RhythmEngine {
 
     this.lanePressSpring[lane] = 1.0;
 
-    const secPerBeat = 60 / this.currentLevel.bpm;
+    const secPerBeat = 60 / this.currentTrack.bpm;
     let bestNote: NoteEvent | null = null;
     let bestAbsSec = Infinity;
 
@@ -1086,7 +1110,7 @@ export class RhythmEngine {
   }
 
   private updateNotesAndTiles(dt: number): void {
-    const secPerBeat = 60 / this.currentLevel.bpm;
+    const secPerBeat = 60 / this.currentTrack.bpm;
     const spawnLookaheadBeats = (STRIKE_Z - SPAWN_Z) / UNITS_PER_BEAT;
 
     for (let i = 0; i < this.notes.length; i++) {
@@ -1289,7 +1313,7 @@ export class RhythmEngine {
   }
 
   private buildHudSnapshot(): HudSnapshot {
-    const secPerBeat = 60 / this.currentLevel.bpm;
+    const secPerBeat = 60 / this.currentTrack.bpm;
 
     let nextRowBeat = Infinity;
     const nearestPerLane: (NoteEvent | null)[] = [null, null, null, null];
@@ -1352,13 +1376,14 @@ export class RhythmEngine {
     return {
       phase: this.phase,
       levelId: this.currentLevel.id,
+      musicTrackId: this.currentTrack.id,
       score: this.score,
       combo: this.combo,
       maxCombo: this.maxCombo,
       multiplier: this.getMultiplier(),
       tempoIntegrity: Math.round(this.tempoIntegrity),
       progress,
-      bpm: this.currentLevel.bpm,
+      bpm: this.currentTrack.bpm,
       currentBeat: this.currentBeat,
       beatPulse: this.beatPulse,
       lastJudgement: this.lastJudgement,

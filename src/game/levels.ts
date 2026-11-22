@@ -1,4 +1,4 @@
-import type { ItemDefinition, ItemType, LevelDefinition, NoteEvent } from './types';
+import type { ItemDefinition, ItemType, LevelDefinition, MusicTrack, NoteEvent } from './types';
 
 export const LANE_KEYS: readonly [string, string, string, string] = ['D', 'F', 'J', 'K'];
 export const ALT_LANE_KEYS: readonly [string, string, string, string] = ['1', '2', '3', '4'];
@@ -359,10 +359,13 @@ export const LEAD_IN_BEATS = 4;
  * Guarantees comfortable D/F/J/K flow, musical phrasing, and prominent
  * placement of the level's signature unique tableware item.
  */
-export function generateLevelChart(level: LevelDefinition): NoteEvent[] {
+export function generateLevelChart(level: LevelDefinition, musicTrack?: MusicTrack): NoteEvent[] {
   const rand = createSeededRandom(level.id * 7919 + level.bpm * 31);
   const notes: NoteEvent[] = [];
   let nextId = 1;
+
+  const activeRootMidi = musicTrack?.rootMidi ?? level.rootMidi;
+  const activeScale = musicTrack?.scaleIntervals ?? level.scaleIntervals;
 
   // Find which lane holds the unique item by default (fallback 0)
   const uniqueLaneIdx = Math.max(0, level.laneItems.indexOf(level.uniqueItem)) as 0 | 1 | 2 | 3;
@@ -373,8 +376,8 @@ export function generateLevelChart(level: LevelDefinition): NoteEvent[] {
 
   const pickScaleMidi = (beatIndex: number, lane: number, isUnique: boolean): number => {
     const motif = motifDegrees[beatIndex % motifDegrees.length];
-    const deg = (motif + (isUnique ? 2 : lane)) % level.scaleIntervals.length;
-    return level.rootMidi + level.scaleIntervals[deg];
+    const deg = (motif + (isUnique ? 2 : lane)) % activeScale.length;
+    return activeRootMidi + activeScale[deg];
   };
 
   const pickItemForLane = (lane: 0 | 1 | 2 | 3, beatIndex: number, forceUnique: boolean): { item: ItemType; isUnique: boolean } => {
@@ -490,7 +493,7 @@ export function generateLevelChart(level: LevelDefinition): NoteEvent[] {
     lane: uniqueLaneIdx,
     item: level.uniqueItem,
     isUnique: true,
-    midiNote: level.rootMidi + 12,
+    midiNote: activeRootMidi + 12,
     hitState: 'pending',
   });
 
