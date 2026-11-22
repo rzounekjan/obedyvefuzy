@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Disc3, Gauge, Music, Play, RotateCcw, Square, Star, Utensils, Volume2, VolumeX, X } from 'lucide-react';
 import { ITEMS, LEVELS } from '../game/levels';
-import { getMusicTrackById, MUSIC_TRACKS } from '../game/musicLibrary';
+import { getMusicTrackById, getTrackSpeedPercent, MUSIC_TRACKS } from '../game/musicLibrary';
 import type { MusicTrackId, ProgressMap } from '../game/types';
 import { ItemIcon } from './ItemIcons';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -26,7 +26,7 @@ type DockTab = 'levels' | 'music';
 /**
  * Full-viewport solid opaque arcade Title Screen framing the live 3D vector tableware showcase.
  * Zero shadows, zero transparency — features a compact 2-tab dock for choosing both
- * the tableware level (1–10) and the YouTube Audio Library rhythmic music style (1–10).
+ * the tableware level (1–10) and the modern PinOut-style synthwave music track & speed (1–10).
  */
 export const TitleScreen: React.FC<TitleScreenProps> = ({
   selectedLevelId,
@@ -46,6 +46,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
   const activeLevel = LEVELS.find((l) => l.id === selectedLevelId) ?? LEVELS[0];
   const activeTrack = getMusicTrackById(selectedTrackId);
+  const activeSpeedPct = getTrackSpeedPercent(activeTrack.index);
   const uniqueItemDef = ITEMS[activeLevel.uniqueItem];
   const levelStats = progress[activeLevel.id];
   const hasSavedProgress = Object.keys(progress).length > 0;
@@ -117,7 +118,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                 <span aria-hidden="true">·</span>
                 <span>{activeLevel.difficulty}</span>
                 <span aria-hidden="true">·</span>
-                <span className="font-mono-tabular text-[#38bdf8] font-bold">{activeTrack.bpm} BPM</span>
+                <span className="font-mono-tabular text-[#38bdf8] font-bold">
+                  Rychlost {activeSpeedPct}%
+                </span>
               </div>
               <h2 className="font-display text-base sm:text-2xl font-bold text-[#ffffff] truncate leading-tight">
                 {activeLevel.name}
@@ -205,7 +208,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               }`}
             >
               <Gauge className="w-3.5 h-3.5 shrink-0" style={{ color: activeTrack.accentHex }} />
-              <span className="truncate">Rychlost · {activeTrack.bpm} BPM</span>
+              <span className="truncate">Rychlost · {activeSpeedPct}%</span>
             </button>
           </div>
 
@@ -257,7 +260,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               })}
             </div>
           ) : (
-            /* 10-Step Speed / BPM Selector Grid (01 = 70 BPM .. 10 = 160 BPM) */
+            /* 10-Step Speed & PinOut Modern Music Selector Grid — buttons labeled strictly with numbers 1–10 */
             <div className="flex flex-col gap-1.5">
               <div className="level-scroll grid grid-cols-5 lg:grid-cols-10 gap-1 sm:gap-1.5 overflow-x-auto">
                 {MUSIC_TRACKS.map((track) => {
@@ -268,53 +271,37 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                       key={track.id}
                       type="button"
                       onClick={() => onSelectTrack(track.id)}
-                      className={`flex flex-col items-center justify-between rounded-lg border-2 px-1 py-1.5 sm:px-1.5 sm:py-2 transition-colors cursor-pointer min-h-[60px] sm:min-h-[74px] focus-visible:outline-2 focus-visible:outline-[#38bdf8] ${
+                      aria-label={`Skladba ${track.index}`}
+                      aria-pressed={isSelected}
+                      className={`flex items-center justify-center rounded-lg border-2 px-1 py-2 transition-colors cursor-pointer min-h-[56px] sm:min-h-[68px] focus-visible:outline-2 focus-visible:outline-[#38bdf8] ${
                         isSelected
                           ? 'bg-[#262152] text-[#ffffff]'
-                          : 'border-[#26224a] bg-[#1a1736] text-[#94a3b8] hover:border-[#38bdf8] hover:bg-[#221d45] hover:text-[#ffffff]'
+                          : 'border-[#26224a] bg-[#1a1736] text-[#cbd5e1] hover:border-[#38bdf8] hover:bg-[#221d45] hover:text-[#ffffff]'
                       }`}
                       style={isSelected ? { borderColor: track.accentHex } : undefined}
                     >
-                      <div className="w-full flex items-center justify-between px-0.5 text-[9px] sm:text-[10px] font-mono-tabular">
-                        <span
-                          className="font-bold"
-                          style={{ color: isSelected ? track.accentHex : '#64748b' }}
-                        >
-                          {String(track.index).padStart(2, '0')}
-                        </span>
-                        <span className={isSelected ? 'text-[#ffd166] font-bold' : 'text-[#64748b]'}>
-                          BPM
-                        </span>
-                      </div>
-
-                      <div
-                        className="my-0.5 font-mono-tabular text-sm sm:text-base font-extrabold leading-none"
-                        style={{ color: isSelected ? track.accentHex : '#ffffff' }}
+                      <span
+                        className="font-mono-tabular text-xl sm:text-2xl font-extrabold leading-none"
+                        style={{ color: isSelected ? track.accentHex : undefined }}
                       >
-                        {track.bpm}
-                      </div>
-
-                      <span className="w-full text-center text-[9px] sm:text-[10px] font-bold tracking-tight truncate whitespace-nowrap">
-                        {track.styleLabel}
+                        {track.index}
                       </span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Active Speed & YouTube Audio Library Track Bar */}
+              {/* Active Speed & PinOut Modern Music Track Bar */}
               <div className="flex items-center justify-between gap-2 rounded-lg border border-[#2d2858] bg-[#1a1736] px-2.5 py-1.5 text-[11px] sm:text-xs text-[#cbd5e1]">
                 <span className="truncate">
-                  <strong className="text-[#ffd166]">Rychlost {String(activeTrack.index).padStart(2, '0')}</strong>
+                  <strong className="text-[#ffd166]">Skladba {activeTrack.index}</strong>
                   {' · '}
-                  <strong className="text-[#ffffff]">{activeTrack.genre}</strong>
-                  {' · '}
-                  {activeTrack.artist} – {activeTrack.title}
+                  <strong className="text-[#ffffff]">{activeTrack.title}</strong>
                   {' · '}
                   <span className="text-[#94a3b8]">{activeTrack.sourceLabel}</span>
                 </span>
                 <span className="font-mono-tabular font-bold text-[#38bdf8] shrink-0">
-                  {activeTrack.bpm} BPM
+                  {activeSpeedPct}%
                 </span>
               </div>
             </div>

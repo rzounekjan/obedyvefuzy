@@ -10,7 +10,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { getLevelById } from '../game/levels';
-import { getMusicTrackById } from '../game/musicLibrary';
+import { getMusicTrackById, getTrackSpeedPercent } from '../game/musicLibrary';
 import type { HitJudgement, HudSnapshot, ServiceCalloutKind } from '../game/types';
 import { ServiceBurstEffect } from './ServiceBurstEffect';
 
@@ -192,7 +192,7 @@ export const GameHud: React.FC<GameHudProps> = ({ hud, muted, onToggleMute, onPa
             {String(level.id).padStart(2, '0')}. {level.name}
           </span>
           <span className="text-[11px] text-[#94a3b8] font-mono-tabular whitespace-nowrap">
-            {track.genre} · {hud.bpm} BPM · {hud.accuracy}% přesnost
+            {track.genre} · {getTrackSpeedPercent(track.index)}% rychlost · {hud.accuracy}% přesnost
           </span>
         </div>
 

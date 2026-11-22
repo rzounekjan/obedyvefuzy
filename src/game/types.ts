@@ -33,16 +33,16 @@ export type GamePhase = 'title' | 'playing' | 'paused' | 'victory' | 'gameover';
 export type MusicStyle = 'dubstep' | 'disco' | 'rnb';
 
 export type MusicTrackId =
-  | 'rnb-dream-catcher'
-  | 'rnb-chillin-hard'
-  | 'rnb-retro-groove'
-  | 'disco-style-funk'
-  | 'disco-son-rocket'
-  | 'disco-your-call'
-  | 'dubstep-ouroboros'
-  | 'dubstep-laser-groove'
-  | 'dubstep-trips-it'
-  | 'dubstep-cyborg-ninja';
+  | 'pinout-neonovy-start'
+  | 'pinout-svetelny-tunel'
+  | 'pinout-laserova-brana'
+  | 'pinout-pulzujici-draha'
+  | 'pinout-nocni-horizont'
+  | 'pinout-kristalovy-odraz'
+  | 'pinout-hologramovy-rytmus'
+  | 'pinout-plazmovy-sprint'
+  | 'pinout-kosmicky-skok'
+  | 'pinout-nekonecny-cas';
 
 export type SciFiSfxMode = 'laser' | 'plasma' | 'photon';
 
