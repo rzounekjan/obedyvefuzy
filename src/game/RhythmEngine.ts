@@ -24,7 +24,8 @@ const TRACK_WIDTH = LANE_COUNT * LANE_WIDTH; // 7.4
 const TRACK_LENGTH = 56;
 const STRIKE_Z = 3.2;
 const SPAWN_Z = -39;
-const SCROLL_UNITS_PER_SEC = 10.6; // Constant smooth optical glide velocity independent of BPM
+const BASE_SCROLL_UNITS_PER_SEC = 10.2; // Smooth baseline velocity on track #1 (slowest)
+const TRACK_SPEED_STEP = 1.03; // +3% speed increase for each music track step (#1 .. #10)
 const HIGHWAY_BAR_COUNT = 12;
 const HIGHWAY_BAR_SPACING = 4.2;
 const LEAD_IN_SEC = 2.15;
@@ -211,9 +212,11 @@ export class RhythmEngine {
   private lastEmittedProgressPct = -1;
   private cachedLanePrompts: [LanePrompt, LanePrompt, LanePrompt, LanePrompt];
 
-  // Smooth continuous simulation timeline (seconds) — decoupled from BPM
+  // Smooth continuous simulation timeline (seconds) — decoupled from BPM, scaled +3% per track (#1..#10)
   private simTimeSec = 0;
   private endTimeSec = 30;
+  private speedMultiplier = 1;
+  private activeScrollSpeed = BASE_SCROLL_UNITS_PER_SEC;
   private pulsePhase = 0;
   private hitFlashPulse = 0;
   private playCameraSettled = false;
@@ -724,9 +727,12 @@ export class RhythmEngine {
 
     this.notes = generateLevelChart(level, track);
 
-    // Precompute smooth arrival timestamps strictly from the level's optimal arcade pace
-    // (100% decoupled from the selected music track's BPM and AudioContext buffer quanta)
-    const levelStepSec = 60 / level.bpm;
+    // Scale overall game speed by +3% per selected music track (#1 = slowest 1.00x, #10 = fastest 1.03^9)
+    // while keeping motion 100% driven by smooth VSync seconds (decoupled from BPM & audio jitter)
+    this.speedMultiplier = Math.pow(TRACK_SPEED_STEP, Math.max(0, track.index - 1));
+    this.activeScrollSpeed = BASE_SCROLL_UNITS_PER_SEC * this.speedMultiplier;
+
+    const levelStepSec = 60 / level.bpm / this.speedMultiplier;
     this.noteTimesSec = new Float64Array(this.notes.length);
     for (let i = 0; i < this.notes.length; i++) {
       this.noteTimesSec[i] = LEAD_IN_SEC + (this.notes[i].beat - LEAD_IN_BEATS) * levelStepSec;
@@ -1235,7 +1241,12 @@ export class RhythmEngine {
         this.showcaseItemMesh.position.y = 0.08 + Math.sin(this.elapsedIdle * 2.2) * 0.06;
       }
 
-      this.updateHighwayAndEqualizer(this.elapsedIdle * 0.45, 0.22 + 0.14 * Math.sin(this.elapsedIdle * 2.4), dt);
+      this.updateHighwayAndEqualizer(
+        this.elapsedIdle * 0.45,
+        BASE_SCROLL_UNITS_PER_SEC,
+        0.22 + 0.14 * Math.sin(this.elapsedIdle * 2.4),
+        dt,
+      );
       this.updateParticlesAndShockwaves(dt);
       return;
     }
@@ -1269,7 +1280,7 @@ export class RhythmEngine {
       const visualPulse = Math.min(1, ambientWave + this.hitFlashPulse * 0.78);
 
       this.updateNotesAndTiles(dt);
-      this.updateHighwayAndEqualizer(this.simTimeSec, visualPulse, dt);
+      this.updateHighwayAndEqualizer(this.simTimeSec, this.activeScrollSpeed, visualPulse, dt);
 
       if (this.simTimeSec >= this.endTimeSec && this.phase === 'playing') {
         this.phase = 'victory';
@@ -1288,14 +1299,15 @@ export class RhythmEngine {
         this.emitHud(false);
       }
     } else {
-      this.updateHighwayAndEqualizer(this.simTimeSec, this.hitFlashPulse * 0.35, dt);
+      this.updateHighwayAndEqualizer(this.simTimeSec, this.activeScrollSpeed, this.hitFlashPulse * 0.35, dt);
     }
 
     this.updateParticlesAndShockwaves(dt);
   }
 
   private updateNotesAndTiles(dt: number): void {
-    const spawnLookaheadSec = (STRIKE_Z - SPAWN_Z) / SCROLL_UNITS_PER_SEC;
+    const scrollSpeed = this.activeScrollSpeed;
+    const spawnLookaheadSec = (STRIKE_Z - SPAWN_Z) / scrollSpeed;
     const totalNotes = this.notes.length;
 
     // O(1) amortized spawning cursor (never rescans already-spawned notes)
@@ -1350,7 +1362,7 @@ export class RhythmEngine {
       if (vis.missedAnim > 0) {
         vis.missedAnim += dt * 4.4;
         const t = Math.min(1, vis.missedAnim);
-        vis.group.position.z = STRIKE_Z + (this.simTimeSec - vis.noteTimeSec) * SCROLL_UNITS_PER_SEC;
+        vis.group.position.z = STRIKE_Z + (this.simTimeSec - vis.noteTimeSec) * scrollSpeed;
         vis.group.position.y = -t * 0.9;
         vis.group.scale.setScalar(Math.max(0.01, 1 - t));
         vis.rimMat.color.setHex(0xff3b6b);
@@ -1361,9 +1373,9 @@ export class RhythmEngine {
         return;
       }
 
-      // Pure constant-velocity glide (zero BPM coupling, zero vertical bounce jitter!)
+      // Pure constant-velocity glide scaled +3% per track (zero BPM coupling, zero vertical bounce jitter!)
       const deltaSec = vis.noteTimeSec - this.simTimeSec;
-      const z = STRIKE_Z - deltaSec * SCROLL_UNITS_PER_SEC;
+      const z = STRIKE_Z - deltaSec * scrollSpeed;
       vis.group.position.z = z;
 
       // Smooth opaque pop-in at far horizon
@@ -1393,9 +1405,9 @@ export class RhythmEngine {
     }
   }
 
-  private updateHighwayAndEqualizer(timeSec: number, pulse: number, dt: number): void {
-    // Scroll highway bars at the EXACT same constant world velocity as tiles (1 single InstancedMesh draw call!)
-    const scrollOffset = ((timeSec * SCROLL_UNITS_PER_SEC) % HIGHWAY_BAR_SPACING + HIGHWAY_BAR_SPACING) % HIGHWAY_BAR_SPACING;
+  private updateHighwayAndEqualizer(timeSec: number, scrollSpeed: number, pulse: number, dt: number): void {
+    // Scroll highway bars at the EXACT same smooth world velocity as tiles (1 single InstancedMesh draw call!)
+    const scrollOffset = ((timeSec * scrollSpeed) % HIGHWAY_BAR_SPACING + HIGHWAY_BAR_SPACING) % HIGHWAY_BAR_SPACING;
     _dummy.rotation.set(0, 0, 0);
     _dummy.scale.set(1, 1, 1);
     for (let i = 0; i < HIGHWAY_BAR_COUNT; i++) {
