@@ -20,10 +20,11 @@ export const PWAInstallButton: React.FC = () => {
       <button
         type="button"
         onClick={() => void install()}
-        className="pointer-events-auto flex h-11 items-center gap-2 rounded-lg border-2 border-[#38bdf8] bg-[#141229] px-3.5 text-xs sm:text-sm font-bold text-[#f8fafc] hover:bg-[#1e1b3c] hover:border-[#ffd166] transition-colors cursor-pointer whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#ffd166]"
+        className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-lg border-2 border-[#3a346e] bg-[#141229] text-[#38bdf8] hover:border-[#ffd166] hover:bg-[#242048] hover:text-[#ffd166] transition-colors cursor-pointer shrink-0 focus-visible:outline-2 focus-visible:outline-[#ffd166]"
+        aria-label="Instalovat aplikaci"
+        title="Instalovat aplikaci"
       >
-        <Download className="w-4 h-4 text-[#38bdf8]" />
-        <span>Instalovat</span>
+        <Download className="w-5 h-5" />
       </button>
     );
   }
@@ -34,10 +35,11 @@ export const PWAInstallButton: React.FC = () => {
         <button
           type="button"
           onClick={() => setShowIOSGuide(true)}
-          className="pointer-events-auto flex h-11 items-center gap-2 rounded-lg border-2 border-[#38bdf8] bg-[#141229] px-3.5 text-xs sm:text-sm font-bold text-[#f8fafc] hover:bg-[#1e1b3c] hover:border-[#ffd166] transition-colors cursor-pointer whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#ffd166]"
+          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-lg border-2 border-[#3a346e] bg-[#141229] text-[#38bdf8] hover:border-[#ffd166] hover:bg-[#242048] hover:text-[#ffd166] transition-colors cursor-pointer shrink-0 focus-visible:outline-2 focus-visible:outline-[#ffd166]"
+          aria-label="Instalovat aplikaci"
+          title="Instalovat aplikaci"
         >
-          <Download className="w-4 h-4 text-[#38bdf8]" />
-          <span>Instalovat</span>
+          <Download className="w-5 h-5" />
         </button>
 
         {showIOSGuide && (

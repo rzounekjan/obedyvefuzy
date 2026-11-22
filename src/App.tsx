@@ -191,6 +191,16 @@ export default function App() {
     setMuted(nextMuted);
   }, []);
 
+  const handleResetProgress = useCallback(() => {
+    setProgress({});
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Ignore storage access errors
+    }
+    engineRef.current?.audio.playUiSelect(52);
+  }, []);
+
   const handlePause = useCallback(() => {
     engineRef.current?.pauseGame();
   }, []);
@@ -345,6 +355,7 @@ export default function App() {
           onTogglePreview={handleTogglePreview}
           onStartLevel={handleStartLevel}
           onToggleMute={handleToggleMute}
+          onResetProgress={handleResetProgress}
         />
       )}
 

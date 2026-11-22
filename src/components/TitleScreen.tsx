@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Disc3, Gauge, Music, Play, Square, Star, Utensils, Volume2, VolumeX } from 'lucide-react';
+import { Disc3, Gauge, Music, Play, RotateCcw, Square, Star, Utensils, Volume2, VolumeX, X } from 'lucide-react';
 import { ITEMS, LEVELS } from '../game/levels';
 import { getMusicTrackById, MUSIC_TRACKS } from '../game/musicLibrary';
 import type { MusicTrackId, ProgressMap } from '../game/types';
@@ -18,6 +18,7 @@ interface TitleScreenProps {
   onTogglePreview: () => void;
   onStartLevel: (levelId: number, trackId: MusicTrackId) => void;
   onToggleMute: () => void;
+  onResetProgress: () => void;
 }
 
 type DockTab = 'levels' | 'music';
@@ -38,13 +39,16 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   onTogglePreview,
   onStartLevel,
   onToggleMute,
+  onResetProgress,
 }) => {
   const [activeTab, setActiveTab] = useState<DockTab>('levels');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const activeLevel = LEVELS.find((l) => l.id === selectedLevelId) ?? LEVELS[0];
   const activeTrack = getMusicTrackById(selectedTrackId);
   const uniqueItemDef = ITEMS[activeLevel.uniqueItem];
   const levelStats = progress[activeLevel.id];
+  const hasSavedProgress = Object.keys(progress).length > 0;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between px-3.5 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))] sm:p-7">
@@ -71,6 +75,16 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
         <div className="flex items-center gap-2 shrink-0">
           <PWAInstallButton />
+
+          <button
+            type="button"
+            onClick={() => setShowResetConfirm(true)}
+            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-lg border-2 border-[#3a346e] bg-[#141229] text-[#ffffff] hover:border-[#ff3b6b] hover:bg-[#242048] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#ff3b6b]"
+            aria-label="Resetovat body ve všech úrovních"
+            title="Resetovat body ve všech úrovních"
+          >
+            <RotateCcw className={`w-5 h-5 ${hasSavedProgress ? 'text-[#ff6b4a]' : 'text-[#94a3b8]'}`} />
+          </button>
 
           <button
             type="button"
@@ -315,6 +329,63 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           </span>
         </p>
       </div>
+
+      {/* Confirmation dialog for resetting points across all levels */}
+      {showResetConfirm && (
+        <div
+          className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-[#0b0a16] p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-progress-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl border-2 border-[#ff3b6b] bg-[#141229] p-6">
+            <div className="flex items-start justify-between gap-3">
+              <h3
+                id="reset-progress-title"
+                className="font-display text-xl font-bold text-[#ffffff]"
+              >
+                Resetovat všechny body?
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-[#363161] bg-[#1d1a38] text-[#cbd5e1] hover:bg-[#2a2550] hover:text-[#ffffff] cursor-pointer"
+                aria-label="Zavřít"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="mt-3 text-sm text-[#cbd5e1] leading-relaxed">
+              {hasSavedProgress
+                ? 'Všechny získané body, rekordy a hvězdy ze všech 10 úrovní budou nevratně vynulovány.'
+                : 'Ve všech 10 úrovních jsou body již vynulované.'}
+            </p>
+
+            <div className="mt-5 flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="flex-1 rounded-lg border-2 border-[#3a346e] bg-[#1d1a38] hover:bg-[#2a2550] py-2.5 text-sm font-bold text-[#ffffff] transition-colors cursor-pointer"
+              >
+                {hasSavedProgress ? 'Zrušit' : 'Zavřít'}
+              </button>
+              {hasSavedProgress && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onResetProgress();
+                    setShowResetConfirm(false);
+                  }}
+                  className="flex-1 rounded-lg border-2 border-[#ffffff] bg-[#ff3b6b] hover:bg-[#ff547e] py-2.5 text-sm font-extrabold text-[#ffffff] transition-colors cursor-pointer"
+                >
+                  Resetovat vše
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
