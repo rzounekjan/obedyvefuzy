@@ -1,0 +1,8 @@
+{
+  "name": "Rytmus Stolu",
+  "description": "3D rytmická hra ve stylu Magic Tiles se stolním servisem, deseti unikátními předměty a vizuálními efekty synchronizovanými s hudbou.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
