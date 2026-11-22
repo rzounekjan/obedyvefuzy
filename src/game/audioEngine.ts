@@ -1,16 +1,16 @@
 import { DEFAULT_MUSIC_TRACK_ID, getMusicTrackById } from './musicLibrary';
+import { LocalMusicPlayer, type LocalAudioState } from './mp3Player';
 import type { HitJudgement, ItemType, LevelDefinition, MusicStyle, MusicTrack } from './types';
-import { YouTubeMusicController, type YouTubeAudioState } from './youtubePlayer';
 
 function midiToFreq(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
 /**
- * Hybrid YouTube Audio Library (R&B / Diskotéka / Dubstep) + Modern Sci-Fi SFX Engine.
- * - Streams any of the 10 curated R&B, Disco, and Dubstep tracks starting directly in the music.
- * - Maintains a rock-solid Web Audio beat clock & style-matched offline fallback groove
- *   (auto-ducks to 0 when YouTube audio enters PLAYING).
+ * Ad-free Local MP3 (R&B / Diskotéka / Dubstep) + Modern Sci-Fi SFX Engine.
+ * - Plays 10 bundled exact-BPM MP3 tracks directly with zero ads and offline PWA support.
+ * - Maintains a rock-solid Web Audio beat clock & style-matched fallback groove
+ *   (auto-ducks to 0 as soon as the local MP3 audio enters PLAYING).
  * - Synthesizes crisp, modern sci-fi laser, plasma pulse, and photon beam hit sounds
  *   harmonically locked to the active track's key & scale, plus sci-fi energy-drain miss SFX.
  */
@@ -22,8 +22,8 @@ export class RhythmAudioEngine {
   private sfxCompressor: DynamicsCompressorNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
 
-  private yt: YouTubeMusicController;
-  private ytState: YouTubeAudioState = 'idle';
+  private player: LocalMusicPlayer;
+  private playerState: LocalAudioState = 'idle';
 
   private muted = false;
   private activeLevel: LevelDefinition | null = null;
@@ -40,8 +40,8 @@ export class RhythmAudioEngine {
   private lastScheduledStep = -1;
 
   constructor() {
-    this.yt = new YouTubeMusicController((state) => {
-      this.ytState = state;
+    this.player = new LocalMusicPlayer((state) => {
+      this.playerState = state;
       this.syncFallbackMusicGain();
     });
   }
@@ -93,9 +93,9 @@ export class RhythmAudioEngine {
   private syncFallbackMusicGain(): void {
     if (!this.ctx || !this.musicGain) return;
     const now = this.ctx.currentTime;
-    const target = this.ytState === 'playing' ? 0.0 : 0.52;
+    const target = this.playerState === 'playing' ? 0.0 : 0.52;
     this.musicGain.gain.cancelScheduledValues(now);
-    this.musicGain.gain.setTargetAtTime(target, now, 0.09);
+    this.musicGain.gain.setTargetAtTime(target, now, 0.04);
   }
 
   public isMuted(): boolean {
@@ -104,7 +104,7 @@ export class RhythmAudioEngine {
 
   public setMuted(mute: boolean): void {
     this.muted = mute;
-    this.yt.setMuted(mute);
+    this.player.setMuted(mute);
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setTargetAtTime(mute ? 0 : 0.85, this.ctx.currentTime, 0.02);
     }
@@ -121,7 +121,7 @@ export class RhythmAudioEngine {
   public cueMusicTrack(track: MusicTrack): void {
     this.activeTrack = track;
     if (!this.running && !this.previewingTrack) {
-      this.yt.cueTrack(track.youtubeId, track.startSeconds);
+      this.player.cueTrack(track.audioFile);
     }
   }
 
@@ -129,14 +129,14 @@ export class RhythmAudioEngine {
     this.ensureInitialized();
     this.activeTrack = track;
     this.previewingTrack = track;
-    this.yt.playTrack(track.youtubeId, track.startSeconds, true);
+    this.player.playTrack(track.audioFile, true);
   }
 
   public stopPreview(): void {
     if (!this.previewingTrack) return;
     this.previewingTrack = null;
     if (!this.running) {
-      this.yt.stop();
+      this.player.stop();
     }
   }
 
@@ -151,11 +151,11 @@ export class RhythmAudioEngine {
     this.lastScheduledStep = -1;
 
     if (this.ctx) {
-      this.startAudioTime = this.ctx.currentTime + 0.08;
+      this.startAudioTime = this.ctx.currentTime + 0.05;
     }
-    this.fallbackStartMs = performance.now() + 80;
+    this.fallbackStartMs = performance.now() + 50;
 
-    this.yt.playTrack(track.youtubeId, track.startSeconds, true);
+    this.player.playTrack(track.audioFile, true);
     this.syncFallbackMusicGain();
   }
 
@@ -163,7 +163,7 @@ export class RhythmAudioEngine {
     if (!this.running || this.paused) return;
     this.pausedBeat = this.getCurrentBeat();
     this.paused = true;
-    this.yt.pause();
+    this.player.pause();
   }
 
   public resume(): void {
@@ -176,7 +176,7 @@ export class RhythmAudioEngine {
     this.fallbackStartMs = performance.now() - this.pausedBeat * secPerBeat * 1000;
     this.lastScheduledStep = Math.floor(this.pausedBeat * 2);
     this.paused = false;
-    this.yt.resume();
+    this.player.resume();
     this.syncFallbackMusicGain();
   }
 
@@ -185,7 +185,7 @@ export class RhythmAudioEngine {
     this.paused = false;
     this.activeLevel = null;
     this.lastScheduledStep = -1;
-    this.yt.stop();
+    this.player.stop();
   }
 
   public getCurrentBeat(): number {
@@ -212,11 +212,11 @@ export class RhythmAudioEngine {
 
     const maxEighth = Math.floor((lookaheadEnd - this.startAudioTime) / secPerEighth);
     const totalTrackEighths = (level.durationBeats + 8) * 2;
-    const ytActive = this.ytState === 'playing';
+    const mp3Active = this.playerState === 'playing';
 
     for (let step = this.lastScheduledStep + 1; step <= maxEighth; step++) {
       if (step < 0 || step > totalTrackEighths) continue;
-      if (!ytActive) {
+      if (!mp3Active) {
         const stepTime = this.startAudioTime + step * secPerEighth;
         if (stepTime >= now - 0.04) {
           this.scheduleFallbackGrooveStep(step, stepTime, track);
@@ -750,7 +750,7 @@ export class RhythmAudioEngine {
 
   public dispose(): void {
     this.stop();
-    this.yt.dispose();
+    this.player.dispose();
     if (this.ctx) {
       void this.ctx.close();
       this.ctx = null;

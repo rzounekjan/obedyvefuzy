@@ -148,7 +148,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                   : 'border-[#38bdf8] bg-[#1d1a3a] hover:bg-[#2a2457] text-[#ffffff]'
               }`}
               aria-label={isPreviewing ? 'Zastavit ukázku hudby' : 'Přehrát ukázku hudby'}
-              title={isPreviewing ? 'Zastavit ukázku' : 'Přehrát ukázku z YouTube knihovny'}
+              title={isPreviewing ? 'Zastavit ukázku' : 'Přehrát ukázku skladby'}
             >
               {isPreviewing ? (
                 <>

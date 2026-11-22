@@ -33,16 +33,16 @@ export type GamePhase = 'title' | 'playing' | 'paused' | 'victory' | 'gameover';
 export type MusicStyle = 'dubstep' | 'disco' | 'rnb';
 
 export type MusicTrackId =
-  | 'rnb-heartbreak'
-  | 'rnb-raindrops'
-  | 'rnb-cant-do'
-  | 'disco-beach'
-  | 'disco-funky'
-  | 'disco-ultralounge'
-  | 'dubstep-blank'
-  | 'dubstep-bensound'
-  | 'dubstep-savage'
-  | 'dubstep-hellcat';
+  | 'rnb-dream-catcher'
+  | 'rnb-chillin-hard'
+  | 'rnb-retro-groove'
+  | 'disco-style-funk'
+  | 'disco-son-rocket'
+  | 'disco-your-call'
+  | 'dubstep-ouroboros'
+  | 'dubstep-laser-groove'
+  | 'dubstep-trips-it'
+  | 'dubstep-cyborg-ninja';
 
 export type SciFiSfxMode = 'laser' | 'plasma' | 'photon';
 
@@ -56,8 +56,7 @@ export interface MusicTrack {
   title: string;
   artist: string;
   sourceLabel: string;
-  youtubeId: string;
-  startSeconds: number;
+  audioFile: string;
   bpm: number;
   accentHex: string;
   rootMidi: number;
