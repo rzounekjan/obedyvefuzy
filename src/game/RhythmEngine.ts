@@ -292,17 +292,17 @@ export class RhythmEngine {
     this.lowPower = this.isSoftwareGl || this.isMobileLite;
     this.maxParticles = this.lowPower ? 56 : 140;
 
-    // Silky-smooth 60 FPS pixel ratio budget (disabling MSAA & alpha compositing on Mali-G57 slashes fillrate ~60%)
+    // Hardware MSAA antialiasing + crisp HiDPI budget (kept smooth at 60 FPS on mobile & desktop GPUs)
     const dpr = window.devicePixelRatio || 1;
-    this.maxPixelRatio = this.isSoftwareGl ? 1 : this.isMobileLite ? Math.min(dpr, 1.15) : Math.min(dpr, 2);
+    this.maxPixelRatio = this.isSoftwareGl ? 1 : this.isMobileLite ? Math.min(dpr, 1.5) : Math.min(dpr, 2);
     this.currentPixelRatio = this.maxPixelRatio;
 
     this.cachedLanePrompts = this.createStaticLanePrompts(this.currentLevel);
 
-    // 1. Renderer setup — unlit opaque arcade (zero alpha blend, zero MSAA on mobile, zero shadows, zero stencil)
+    // 1. Renderer setup — unlit opaque arcade with hardware MSAA antialiasing on all GPU tiers
     this.renderer = new THREE.WebGLRenderer({
       alpha: false,
-      antialias: !this.lowPower,
+      antialias: !this.isSoftwareGl,
       stencil: false,
       powerPreference: 'high-performance',
     });
@@ -1204,6 +1204,10 @@ export class RhythmEngine {
   private handleResize(): void {
     const w = this.container.clientWidth || window.innerWidth;
     const h = Math.max(1, this.container.clientHeight || window.innerHeight);
+    const dpr = window.devicePixelRatio || 1;
+    this.maxPixelRatio = this.isSoftwareGl ? 1 : this.isMobileLite ? Math.min(dpr, 1.5) : Math.min(dpr, 2);
+    this.currentPixelRatio = Math.min(this.currentPixelRatio, this.maxPixelRatio);
+    this.renderer.setPixelRatio(this.currentPixelRatio);
     this.updateResponsiveCamera(w, h);
     this.playCameraSettled = false;
     this.renderer.setSize(w, h);
@@ -1634,9 +1638,9 @@ export class RhythmEngine {
     this.perfFrameCount = 0;
     this.perfFrameTimeAcc = 0;
 
-    if (avgMs > 19.5 && this.currentPixelRatio > 0.75) {
+    if (avgMs > 19.5 && this.currentPixelRatio > 0.95) {
       this.perfHeadroomStreak = 0;
-      this.currentPixelRatio = Math.max(0.75, Number((this.currentPixelRatio - 0.12).toFixed(2)));
+      this.currentPixelRatio = Math.max(0.95, Number((this.currentPixelRatio - 0.1).toFixed(2)));
       this.renderer.setPixelRatio(this.currentPixelRatio);
     } else if (avgMs < 15.5 && this.currentPixelRatio < this.maxPixelRatio) {
       this.perfHeadroomStreak += 1;
