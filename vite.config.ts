@@ -11,14 +11,33 @@ function normalizeBase(rawBase?: string): string {
   return withLeading.endsWith('/') ? withLeading : `${withLeading}/`;
 }
 
+function normalizeSiteUrl(rawUrl?: string): string | null {
+  if (!rawUrl) return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+  return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
+}
+
+const DEFAULT_PUBLIC_URL = 'https://rzounekjan.github.io/obedyvefuzy/';
+
 export default defineConfig(() => {
   const base = normalizeBase(process.env.BASE_PATH);
+  const siteUrl = normalizeSiteUrl(process.env.SITE_URL || process.env.APP_URL) ?? DEFAULT_PUBLIC_URL;
 
   return {
     base,
     plugins: [
       react(),
       tailwindcss(),
+      {
+        name: 'rewrite-social-meta-urls',
+        transformIndexHtml(html: string): string {
+          if (siteUrl === DEFAULT_PUBLIC_URL) {
+            return html;
+          }
+          return html.split(DEFAULT_PUBLIC_URL).join(siteUrl);
+        },
+      },
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png'],

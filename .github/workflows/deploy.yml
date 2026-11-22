@@ -42,7 +42,8 @@ jobs:
           else
             export BASE_PATH="/${REPO_NAME}/"
           fi
-          echo "Použitý BASE_PATH=${BASE_PATH}"
+          export SITE_URL="https://${OWNER_LOWER,,}.github.io${BASE_PATH}"
+          echo "Použitý BASE_PATH=${BASE_PATH}, SITE_URL=${SITE_URL}"
           rm -rf public/assets/aistudio
           npm run build
           cp dist/index.html dist/404.html
