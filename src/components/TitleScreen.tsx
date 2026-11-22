@@ -57,7 +57,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                 Rytmus Stolu
               </h1>
               <p className="mt-1 sm:mt-1.5 text-[11px] sm:text-sm text-[#cbd5e1] leading-snug">
-                Arkádový rytmický servis · 10 předmětů · 10 hudebních stylů
+                Arkádový servis · Drum &amp; Bass · Diskotéka · R&amp;B
               </p>
             </div>
           </div>
@@ -185,7 +185,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               }`}
             >
               <Music className="w-3.5 h-3.5 shrink-0" style={{ color: activeTrack.accentHex }} />
-              <span className="truncate">Hudba (YouTube) · {activeTrack.shortGenre}</span>
+              <span className="truncate">Hudba (DnB · Disko · R&amp;B)</span>
             </button>
           </div>
 

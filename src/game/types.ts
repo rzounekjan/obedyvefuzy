@@ -14,47 +14,40 @@ export type HitJudgement = 'perfect' | 'great' | 'good' | 'miss';
 
 export type GamePhase = 'title' | 'playing' | 'paused' | 'victory' | 'gameover';
 
-export type MusicTrackId =
-  | 'tropical-house'
-  | 'modern-funk'
-  | 'nu-disco'
-  | 'electro-swing'
-  | 'synthwave'
-  | 'lofi-beat'
-  | 'latin-salsa'
-  | 'future-bass'
-  | 'dark-edm'
-  | 'drum-and-bass';
+export type MusicStyle = 'dnb' | 'disco' | 'rnb';
 
-export type SfxProfileId =
-  | 'tropical'
-  | 'funk'
-  | 'disco'
-  | 'swing'
-  | 'synthwave'
-  | 'lofi'
-  | 'latin'
-  | 'futurebass'
-  | 'darkedm'
-  | 'dnb';
+export type MusicTrackId =
+  | 'dnb-pulse'
+  | 'dnb-liquid'
+  | 'dnb-arcade'
+  | 'dnb-skyline'
+  | 'disco-sunday'
+  | 'disco-climax'
+  | 'disco-funk'
+  | 'rnb-smooth'
+  | 'rnb-aesthetic'
+  | 'rnb-groove';
+
+export type SciFiSfxMode = 'laser' | 'plasma' | 'photon';
 
 export interface MusicTrack {
   id: MusicTrackId;
   index: number;
+  style: MusicStyle;
+  styleLabel: string;
   genre: string;
   shortGenre: string;
   title: string;
   artist: string;
   sourceLabel: string;
   youtubeId: string;
-  /** Optional start offset in seconds to skip silent intro on YouTube video */
   startSeconds: number;
   bpm: number;
   accentHex: string;
   rootMidi: number;
   scaleIntervals: number[];
   chordProgression: number[][];
-  sfxProfile: SfxProfileId;
+  sfxMode: SciFiSfxMode;
   sfxDescription: string;
 }
 

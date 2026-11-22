@@ -1,5 +1,5 @@
 import { DEFAULT_MUSIC_TRACK_ID, getMusicTrackById } from './musicLibrary';
-import type { HitJudgement, ItemType, LevelDefinition, MusicTrack, SfxProfileId } from './types';
+import type { HitJudgement, ItemType, LevelDefinition, MusicStyle, MusicTrack } from './types';
 import { YouTubeMusicController, type YouTubeAudioState } from './youtubePlayer';
 
 function midiToFreq(midi: number): number {
@@ -7,12 +7,12 @@ function midiToFreq(midi: number): number {
 }
 
 /**
- * Hybrid YouTube Audio Library + Modern Adaptive Web Audio SFX Engine.
- * - Streams any of the 10 curated rhythmic tracks from the YouTube Audio Library.
- * - Maintains a rock-solid Web Audio beat clock & seamless genre-matched synth fallback
- *   when offline or while YouTube buffers (auto-ducks to 0 when YouTube enters PLAYING).
- * - Generates modern, studio-polished hit & miss sound effects dynamically locked
- *   to the musical key, scale, and timbre of the currently playing track.
+ * Hybrid YouTube Audio Library (Drum & Bass / Diskotéka / R&B) + Modern Sci-Fi SFX Engine.
+ * - Streams any of the 10 curated DnB, Disco, and R&B tracks from the YouTube Audio Library.
+ * - Maintains a rock-solid Web Audio beat clock & style-matched offline fallback groove
+ *   (auto-ducks to 0 when YouTube audio enters PLAYING).
+ * - Synthesizes crisp, modern sci-fi laser, plasma pulse, and photon beam hit sounds
+ *   harmonically locked to the active track's key & scale, plus sci-fi energy-drain miss SFX.
  */
 export class RhythmAudioEngine {
   private ctx: AudioContext | null = null;
@@ -55,27 +55,27 @@ export class RhythmAudioEngine {
       this.ctx = new AudioCtx();
 
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = this.muted ? 0 : 0.84;
+      this.masterGain.gain.value = this.muted ? 0 : 0.85;
       this.masterGain.connect(this.ctx.destination);
 
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.value = 0.52;
       this.musicGain.connect(this.masterGain);
 
-      // Modern punchy SFX bus with gentle dynamics compression so chords & combos never clip
+      // Punchy modern sci-fi SFX bus with dynamics compression so rapid laser/plasma hits never clip
       this.sfxCompressor = this.ctx.createDynamicsCompressor();
-      this.sfxCompressor.threshold.value = -14;
-      this.sfxCompressor.knee.value = 12;
-      this.sfxCompressor.ratio.value = 5;
-      this.sfxCompressor.attack.value = 0.003;
-      this.sfxCompressor.release.value = 0.08;
+      this.sfxCompressor.threshold.value = -13;
+      this.sfxCompressor.knee.value = 10;
+      this.sfxCompressor.ratio.value = 5.5;
+      this.sfxCompressor.attack.value = 0.002;
+      this.sfxCompressor.release.value = 0.075;
       this.sfxCompressor.connect(this.masterGain);
 
       this.sfxBus = this.ctx.createGain();
-      this.sfxBus.gain.value = 0.92;
+      this.sfxBus.gain.value = 0.94;
       this.sfxBus.connect(this.sfxCompressor);
 
-      // Pre-generate 0.5s white noise buffer for crisp modern snares, snaps & scratches
+      // Pre-generate 0.5s white noise buffer for plasma sizzle, ion static & drums
       const sr = this.ctx.sampleRate;
       const buf = this.ctx.createBuffer(1, Math.floor(sr * 0.5), sr);
       const data = buf.getChannelData(0);
@@ -93,8 +93,6 @@ export class RhythmAudioEngine {
   private syncFallbackMusicGain(): void {
     if (!this.ctx || !this.musicGain) return;
     const now = this.ctx.currentTime;
-    // When YouTube Audio Library track is actively streaming audio, duck fallback synth to 0
-    // so only the pure YouTube track + modern Web Audio SFX are heard.
     const target = this.ytState === 'playing' ? 0.0 : 0.52;
     this.musicGain.gain.cancelScheduledValues(now);
     this.musicGain.gain.setTargetAtTime(target, now, 0.09);
@@ -108,7 +106,7 @@ export class RhythmAudioEngine {
     this.muted = mute;
     this.yt.setMuted(mute);
     if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setTargetAtTime(mute ? 0 : 0.84, this.ctx.currentTime, 0.02);
+      this.masterGain.gain.setTargetAtTime(mute ? 0 : 0.85, this.ctx.currentTime, 0.02);
     }
   }
 
@@ -127,7 +125,6 @@ export class RhythmAudioEngine {
     }
   }
 
-  /** Audition a YouTube Audio Library track live on the Title Screen */
   public startPreview(track: MusicTrack): void {
     this.ensureInitialized();
     this.activeTrack = track;
@@ -158,7 +155,6 @@ export class RhythmAudioEngine {
     }
     this.fallbackStartMs = performance.now() + 80;
 
-    // Synchronously start YouTube Audio Library playback inside the user gesture
     this.yt.playTrack(track.youtubeId, track.startSeconds, true);
     this.syncFallbackMusicGain();
   }
@@ -203,7 +199,6 @@ export class RhythmAudioEngine {
     return (performance.now() - this.fallbackStartMs) / 1000 / secPerBeat;
   }
 
-  /** Called every frame by the game loop; schedules fallback synth groove when YouTube is offline/buffering */
   public update(): void {
     if (!this.running || this.paused || !this.activeLevel || !this.ctx || this.ctx.state !== 'running') {
       return;
@@ -217,8 +212,6 @@ export class RhythmAudioEngine {
 
     const maxEighth = Math.floor((lookaheadEnd - this.startAudioTime) / secPerEighth);
     const totalTrackEighths = (level.durationBeats + 8) * 2;
-
-    // Skip scheduling fallback audio nodes when YouTube audio is actively streaming (saves CPU on mobile!)
     const ytActive = this.ytState === 'playing';
 
     for (let step = this.lastScheduledStep + 1; step <= maxEighth; step++) {
@@ -233,59 +226,64 @@ export class RhythmAudioEngine {
     }
   }
 
+  /**
+   * Offline / buffering fallback grooves strictly tailored to Drum & Bass, Diskotéka, and R&B.
+   */
   private scheduleFallbackGrooveStep(eighthStep: number, time: number, track: MusicTrack): void {
     if (!this.ctx || !this.musicGain) return;
     const beatInBar = Math.floor(eighthStep / 2) % 4;
     const isOffbeat = eighthStep % 2 === 1;
     const barIndex = Math.floor(eighthStep / 8);
     const chord = track.chordProgression[barIndex % track.chordProgression.length];
-    const profile = track.sfxProfile;
+    const style: MusicStyle = track.style;
 
-    // Four-on-the-floor or syncopated modern kick depending on genre
-    const fourOnFloor =
-      profile === 'tropical' ||
-      profile === 'disco' ||
-      profile === 'synthwave' ||
-      profile === 'darkedm';
-    const kickHit = fourOnFloor
-      ? !isOffbeat
-      : profile === 'dnb'
-        ? (!isOffbeat && beatInBar === 0) || (isOffbeat && beatInBar === 2)
-        : (!isOffbeat && (beatInBar === 0 || beatInBar === 2)) ||
-          (profile === 'funk' && isOffbeat && beatInBar === 1);
-
-    if (kickHit) {
-      this.playKick(time, beatInBar === 0 ? 0.56 : 0.44);
-    }
-
-    // Modern crisp clap/snare on 2 and 4
-    if (!isOffbeat && (beatInBar === 1 || beatInBar === 3)) {
-      this.playModernSnare(time, profile === 'lofi' ? 0.2 : 0.3);
-    }
-
-    // Hi-hat pulse
-    if (isOffbeat || profile === 'dnb' || profile === 'swing' || profile === 'disco') {
-      this.playHiHat(time, isOffbeat ? 0.12 : 0.06);
-    }
-
-    // Sub/synth bassline locked to track chord progression
-    if (!isOffbeat || (profile === 'synthwave' && isOffbeat)) {
-      const bassMidi =
-        beatInBar === 0
-          ? chord[0] - 12
-          : beatInBar === 2
-            ? chord[2] - 12
-            : chord[0] - 12 + (beatInBar === 3 ? 7 : 0);
-      if (!isOffbeat && (beatInBar === 0 || beatInBar === 2 || fourOnFloor)) {
-        this.playBass(time, midiToFreq(bassMidi), (60 / track.bpm) * 0.68, profile);
-      } else if (profile === 'synthwave' && isOffbeat) {
-        this.playBass(time, midiToFreq(chord[0] - 12), (60 / track.bpm) * 0.32, profile);
+    if (style === 'dnb') {
+      // Classic 2-step Drum & Bass breakbeat (kick on 1 and 2.5, punchy snare on 2 and 4)
+      if ((!isOffbeat && beatInBar === 0) || (isOffbeat && beatInBar === 2)) {
+        this.playKick(time, 0.58);
       }
-    }
-
-    // Chord stab / pad
-    if ((!isOffbeat && beatInBar === 0) || (isOffbeat && beatInBar === 1 && profile !== 'lofi')) {
-      this.playChordPad(time, chord, (60 / track.bpm) * 1.25, beatInBar === 0 ? 0.14 : 0.08);
+      if (!isOffbeat && (beatInBar === 1 || beatInBar === 3)) {
+        this.playModernSnare(time, 0.36);
+      }
+      // Rolling high-energy DnB hats
+      this.playHiHat(time, isOffbeat ? 0.14 : 0.08);
+      if (!isOffbeat && beatInBar === 0) {
+        this.playBass(time, midiToFreq(chord[0] - 12), (60 / track.bpm) * 1.8, 'dnb');
+        this.playChordPad(time, chord, (60 / track.bpm) * 1.8, 0.14);
+      }
+    } else if (style === 'disco') {
+      // Four-on-the-floor Diskotéka groove + offbeat open hat + funky octave bass
+      if (!isOffbeat) {
+        this.playKick(time, beatInBar === 0 ? 0.58 : 0.48);
+      }
+      if (!isOffbeat && (beatInBar === 1 || beatInBar === 3)) {
+        this.playModernSnare(time, 0.3);
+      }
+      if (isOffbeat) {
+        this.playHiHat(time, 0.15);
+      }
+      const bassMidi = isOffbeat ? chord[0] : chord[0] - 12;
+      this.playBass(time, midiToFreq(bassMidi), (60 / track.bpm) * 0.4, 'disco');
+      if ((!isOffbeat && beatInBar === 0) || (isOffbeat && beatInBar === 1)) {
+        this.playChordPad(time, chord, (60 / track.bpm) * 0.9, 0.14);
+      }
+    } else {
+      // Smooth syncopated modern R&B pocket + lush warm chords
+      if ((!isOffbeat && beatInBar === 0) || (isOffbeat && (beatInBar === 1 || beatInBar === 2))) {
+        this.playKick(time, beatInBar === 0 ? 0.55 : 0.38);
+      }
+      if (!isOffbeat && (beatInBar === 1 || beatInBar === 3)) {
+        this.playModernSnare(time, 0.24);
+      }
+      if (isOffbeat || beatInBar === 0 || beatInBar === 2) {
+        this.playHiHat(time, isOffbeat ? 0.09 : 0.05);
+      }
+      if (!isOffbeat && (beatInBar === 0 || beatInBar === 2)) {
+        this.playBass(time, midiToFreq(chord[0] - 12), (60 / track.bpm) * 1.3, 'rnb');
+      }
+      if (!isOffbeat && beatInBar === 0) {
+        this.playChordPad(time, chord, (60 / track.bpm) * 2.4, 0.16);
+      }
     }
   }
 
@@ -295,7 +293,7 @@ export class RhythmAudioEngine {
     const gain = this.ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(155, time);
-    osc.frequency.exponentialRampToValueAtTime(44, time + 0.1);
+    osc.frequency.exponentialRampToValueAtTime(42, time + 0.1);
 
     gain.gain.setValueAtTime(gainAmt, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 0.21);
@@ -338,28 +336,28 @@ export class RhythmAudioEngine {
 
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(gainAmt, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.042);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
 
     src.connect(filter);
     filter.connect(gain);
     gain.connect(this.musicGain);
     src.start(time);
-    src.stop(time + 0.048);
+    src.stop(time + 0.05);
   }
 
-  private playBass(time: number, freq: number, duration: number, profile: SfxProfileId): void {
+  private playBass(time: number, freq: number, duration: number, style: MusicStyle): void {
     if (!this.ctx || !this.musicGain) return;
     const osc = this.ctx.createOscillator();
     const filter = this.ctx.createBiquadFilter();
     const gain = this.ctx.createGain();
 
-    osc.type = profile === 'synthwave' || profile === 'darkedm' ? 'sawtooth' : 'triangle';
+    osc.type = style === 'dnb' ? 'sawtooth' : 'triangle';
     osc.frequency.setValueAtTime(freq, time);
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(profile === 'synthwave' || profile === 'darkedm' ? 680 : 420, time);
+    filter.frequency.setValueAtTime(style === 'dnb' ? 540 : style === 'disco' ? 620 : 340, time);
 
     gain.gain.setValueAtTime(0.001, time);
-    gain.gain.linearRampToValueAtTime(0.3, time + 0.012);
+    gain.gain.linearRampToValueAtTime(0.32, time + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
 
     osc.connect(filter);
@@ -378,7 +376,7 @@ export class RhythmAudioEngine {
       osc.frequency.setValueAtTime(midiToFreq(midis[i] + 12), time);
 
       gain.gain.setValueAtTime(0.001, time);
-      gain.gain.linearRampToValueAtTime(gainAmt / midis.length, time + 0.022);
+      gain.gain.linearRampToValueAtTime(gainAmt / midis.length, time + 0.025);
       gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
 
       osc.connect(gain);
@@ -388,10 +386,6 @@ export class RhythmAudioEngine {
     }
   }
 
-  /**
-   * Quantize any MIDI pitch cleanly into the currently playing music track's exact key & scale,
-   * so every tap sounds like an authentic modern instrument note inside the track.
-   */
   private quantizeToActiveScale(midiNote: number): number {
     const track = this.activeTrack;
     const rel = midiNote - track.rootMidi;
@@ -412,11 +406,8 @@ export class RhythmAudioEngine {
   }
 
   /**
-   * Plays a modern, punchy, genre-matched hit sound locked to the currently playing music track.
-   * Combines:
-   *  1) Modern genre synth/instrument core (matched to activeTrack.sfxProfile)
-   *  2) Crisp tactile transient click scaled to judgement (perfect/great/good)
-   *  3) Subtle item harmonic character + lush radiant chord bloom on unique 2× notes
+   * Plays a modern sci-fi laser / plasma / photon energy hit sound
+   * harmonically locked to the currently playing DnB / Diskotéka / R&B track.
    */
   public playItemHit(item: ItemType, midiNote: number, judgement: HitJudgement, isUnique: boolean): void {
     this.ensureInitialized();
@@ -425,214 +416,241 @@ export class RhythmAudioEngine {
 
     const lockedMidi = this.quantizeToActiveScale(midiNote);
     const baseFreq = midiToFreq(lockedMidi);
-    const profile = this.activeTrack.sfxProfile;
 
     const judgeVol = judgement === 'perfect' ? 0.36 : judgement === 'great' ? 0.29 : 0.22;
     const vol = judgeVol * (isUnique ? 1.18 : 1.0);
-    const brightness = judgement === 'perfect' ? 1.0 : judgement === 'great' ? 0.8 : 0.56;
+    const brightness = judgement === 'perfect' ? 1.0 : judgement === 'great' ? 0.8 : 0.58;
 
-    // 1) Crisp modern studio micro-transient (tactile hit confirmation, zero harsh click)
-    this.playSfxTransient(now, profile, vol * 0.45, brightness);
-
-    // 2) Genre-matched modern musical hit core
-    switch (profile) {
-      case 'tropical': {
-        // Modern bright tropical marimba / kalimba pluck
-        this.triggerFilteredPluck(now, baseFreq * 2, 'sine', vol * 0.85, 0.24, 3800 * brightness, 900);
-        this.triggerFilteredPluck(now, baseFreq * 4, 'triangle', vol * 0.28, 0.09, 5200 * brightness, 1400);
-        break;
-      }
-      case 'funk': {
-        // Punchy FM clavinet / funky synth stab
-        this.triggerFilteredPluck(now, baseFreq, 'sawtooth', vol * 0.52, 0.16, 3600 * brightness, 480, 3.2);
-        this.triggerFilteredPluck(now, baseFreq * 2, 'triangle', vol * 0.55, 0.18, 2800 * brightness, 650);
-        break;
-      }
-      case 'disco': {
-        // Shimmering octave Nu-Disco bell + bright snap
-        this.triggerTone(now, baseFreq * 2, 'sine', vol * 0.72, 0.26);
-        this.triggerFilteredPluck(now, baseFreq * 3, 'triangle', vol * 0.38, 0.16, 4600 * brightness, 1200);
-        break;
-      }
-      case 'swing': {
-        // Modern electro-brass chord blip + crisp jazz snap
-        this.triggerFilteredPluck(now, baseFreq, 'sawtooth', vol * 0.44, 0.19, 2600 * brightness, 520, 1.8);
-        this.triggerFilteredPluck(now, baseFreq * 1.498, 'triangle', vol * 0.48, 0.21, 2400 * brightness, 700);
-        break;
-      }
-      case 'synthwave': {
-        // Neon analog detuned saw pluck with resonant lowpass sweep
-        this.triggerFilteredPluck(now, baseFreq * 1.004, 'sawtooth', vol * 0.44, 0.24, 4200 * brightness, 420, 2.4);
-        this.triggerFilteredPluck(now, baseFreq * 0.996, 'sawtooth', vol * 0.44, 0.24, 4200 * brightness, 420, 2.4);
-        this.triggerTone(now, baseFreq * 2, 'sine', vol * 0.34, 0.22);
-        break;
-      }
-      case 'lofi': {
-        // Warm Rhodes electric piano tine bell
-        this.triggerTone(now, baseFreq, 'sine', vol * 0.82, 0.34);
-        this.triggerTone(now, baseFreq * 2, 'sine', vol * 0.32 * brightness, 0.16);
-        this.triggerTone(now, baseFreq * 3, 'sine', vol * 0.12 * brightness, 0.09);
-        break;
-      }
-      case 'latin': {
-        // Crisp wooden clave + resonant modern marimba body
-        this.triggerTone(now, baseFreq * 2.5, 'sine', vol * 0.45, 0.055);
-        this.triggerFilteredPluck(now, baseFreq * 2, 'triangle', vol * 0.76, 0.22, 3400 * brightness, 750);
-        break;
-      }
-      case 'futurebass': {
-        // Lush wide Future Bass supersaw chord stab + crystal top
-        this.triggerFilteredPluck(now, baseFreq, 'sawtooth', vol * 0.36, 0.26, 4800 * brightness, 700, 1.4);
-        this.triggerFilteredPluck(now, baseFreq * 1.007, 'sawtooth', vol * 0.34, 0.26, 4800 * brightness, 700, 1.4);
-        this.triggerFilteredPluck(now, baseFreq * 1.5, 'triangle', vol * 0.42, 0.28, 5200 * brightness, 1100);
-        break;
-      }
-      case 'darkedm': {
-        // Cyberpunk FM metallic pluck + tight bass transient
-        this.triggerFmPluck(now, baseFreq * 2, baseFreq * 4.02, 260 * brightness, vol * 0.68, 0.2);
-        this.triggerTone(now, baseFreq, 'triangle', vol * 0.42, 0.15);
-        break;
-      }
-      case 'dnb': {
-        // Liquid glossy crystal synth ping + airy shimmer
-        this.triggerFmPluck(now, baseFreq * 2, baseFreq * 3, 180 * brightness, vol * 0.64, 0.22);
-        this.triggerTone(now, baseFreq * 4, 'sine', vol * 0.24 * brightness, 0.14);
-        break;
-      }
+    // Pair item group with signature modern sci-fi energy weapon/beam archetype
+    if (item === 'knife' || item === 'fork' || item === 'spoon') {
+      // LASER BEAM: fast FM pitch-zap + focused neon laser ring
+      this.playSciFiLaser(now, baseFreq, vol, brightness);
+    } else if (item === 'plate' || item === 'cloth' || item === 'napkin') {
+      // PLASMA PULSE: dual detuned resonant plasma discharge + energy sub-kick + ion sizzle
+      this.playSciFiPlasma(now, baseFreq, vol, brightness);
+    } else {
+      // PHOTON / ION BEAM (water, beer, shot, wine): upward-arcing crystalline photon beam + FM halo
+      this.playSciFiPhoton(now, baseFreq, vol, brightness);
     }
 
-    // 3) Subtle modern tableware accent layer so each item keeps its crisp tactile identity
-    if (item === 'water' || item === 'shot' || item === 'beer') {
-      // Modern glassy harmonic shimmer
-      this.triggerTone(now + 0.008, baseFreq * 3, 'sine', vol * 0.2 * brightness, 0.16);
-    } else if (item === 'wine' || item === 'napkin') {
-      // Silky upper chord air
-      this.triggerTone(now + 0.018, baseFreq * 2.5, 'sine', vol * 0.22 * brightness, 0.24);
-    } else if (item === 'knife' || item === 'fork' || item === 'spoon') {
-      // Crisp bright metallic overtone ping
-      this.triggerTone(now + 0.004, baseFreq * 4, 'sine', vol * 0.16 * brightness, 0.11);
+    // Track flavor shimmer accent (blends track's preferred sci-fi color)
+    if (this.activeTrack.sfxMode === 'laser' && judgement === 'perfect') {
+      this.triggerLaserSweep(now + 0.01, baseFreq * 5.2, baseFreq * 2.0, 0.055, vol * 0.22, 'sine');
+    } else if (this.activeTrack.sfxMode === 'plasma' && judgement === 'perfect') {
+      this.playPlasmaSizzle(now, 4600, vol * 0.22, 0.045);
     }
 
-    // 4) Radiant modern harmonic chord bloom for unique 2× signature items & Perfect hits
+    // Twin-Beam Hyper-Plasma Overcharge for the level's unique 2× signature object
     if (isUnique) {
       const fifthFreq = midiToFreq(lockedMidi + 7);
       const octFreq = midiToFreq(lockedMidi + 12);
-      this.triggerTone(now + 0.02, fifthFreq, 'sine', vol * 0.36, 0.32);
+      this.triggerLaserSweep(now + 0.018, fifthFreq * 2.4, fifthFreq, 0.09, vol * 0.34, 'triangle');
       if (judgement === 'perfect') {
-        this.triggerTone(now + 0.045, octFreq, 'sine', vol * 0.34, 0.36);
+        this.triggerLaserSweep(now + 0.042, octFreq * 0.75, octFreq * 2.0, 0.14, vol * 0.3, 'sine');
+        this.playPlasmaSizzle(now + 0.015, 6200, vol * 0.26, 0.075);
       }
-    } else if (judgement === 'perfect') {
-      this.triggerTone(now + 0.012, baseFreq * 2, 'sine', vol * 0.18, 0.18);
     }
   }
 
+  /** Focused modern sci-fi laser zap + harmonic beam tail */
+  private playSciFiLaser(time: number, baseFreq: number, vol: number, brightness: number): void {
+    if (!this.ctx || !this.sfxBus) return;
+
+    // 1. High-energy downward laser pitch-sweep with FM modulation
+    const carrier = this.ctx.createOscillator();
+    const mod = this.ctx.createOscillator();
+    const modGain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    carrier.type = 'sawtooth';
+    carrier.frequency.setValueAtTime(Math.min(4800, baseFreq * 5.0 * brightness + 420), time);
+    carrier.frequency.exponentialRampToValueAtTime(baseFreq * 1.0, time + 0.072);
+
+    mod.type = 'sine';
+    mod.frequency.setValueAtTime(baseFreq * 3.01, time);
+    modGain.gain.setValueAtTime(420 * brightness, time);
+    modGain.gain.exponentialRampToValueAtTime(8, time + 0.08);
+
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(3600 * brightness + 600, time);
+    filter.frequency.exponentialRampToValueAtTime(Math.max(420, baseFreq * 1.8), time + 0.13);
+    filter.Q.value = 2.6;
+
+    gain.gain.setValueAtTime(0.001, time);
+    gain.gain.linearRampToValueAtTime(vol * 0.88, time + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
+
+    mod.connect(modGain);
+    modGain.connect(carrier.frequency);
+    carrier.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxBus);
+
+    mod.start(time);
+    carrier.start(time);
+    mod.stop(time + 0.18);
+    carrier.stop(time + 0.18);
+
+    // 2. Crisp musical neon laser core locked in key
+    this.triggerLaserSweep(time, baseFreq * 3.0, baseFreq * 2.0, 0.045, vol * 0.48, 'sine');
+    this.playPlasmaSizzle(time, 5200 * brightness + 800, vol * 0.24, 0.032);
+  }
+
+  /** Rich sci-fi plasma pulse: detuned resonant energy wave + punchy plasma sub-thump + ion sizzle */
+  private playSciFiPlasma(time: number, baseFreq: number, vol: number, brightness: number): void {
+    if (!this.ctx || !this.sfxBus) return;
+
+    // 1. Dual detuned plasma oscillators swept through resonant lowpass filter
+    const detunes = [0.992, 1.008];
+    for (let i = 0; i < detunes.length; i++) {
+      const osc = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const g = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(baseFreq * 1.75 * detunes[i], time);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * detunes[i], time + 0.095);
+
+      filter.type = 'lowpass';
+      filter.Q.value = 4.2;
+      filter.frequency.setValueAtTime(4800 * brightness + 500, time);
+      filter.frequency.exponentialRampToValueAtTime(Math.max(320, baseFreq * 1.4), time + 0.18);
+
+      g.gain.setValueAtTime(0.001, time);
+      g.gain.linearRampToValueAtTime(vol * 0.44, time + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+
+      osc.connect(filter);
+      filter.connect(g);
+      g.connect(this.sfxBus);
+      osc.start(time);
+      osc.stop(time + 0.22);
+    }
+
+    // 2. Tight sci-fi plasma energy sub-pulse
+    this.triggerLaserSweep(time, 180, 56, 0.075, vol * 0.46, 'sine');
+
+    // 3. Ion plasma electric sizzle crackle
+    this.playPlasmaSizzle(time, 4200 * brightness + 900, vol * 0.34, 0.055);
+  }
+
+  /** Sleek sci-fi photon / ion beam: upward-arcing crystalline FM sweep + glossy harmonic aura */
+  private playSciFiPhoton(time: number, baseFreq: number, vol: number, brightness: number): void {
+    if (!this.ctx || !this.sfxBus) return;
+
+    // 1. Upward-ignition photon charge beam
+    const carrier = this.ctx.createOscillator();
+    const mod = this.ctx.createOscillator();
+    const modGain = this.ctx.createGain();
+    const g = this.ctx.createGain();
+
+    carrier.type = 'sine';
+    carrier.frequency.setValueAtTime(baseFreq * 1.25, time);
+    carrier.frequency.exponentialRampToValueAtTime(baseFreq * 2.0, time + 0.042);
+
+    mod.type = 'triangle';
+    mod.frequency.setValueAtTime(baseFreq * 4.02, time);
+    modGain.gain.setValueAtTime(340 * brightness, time);
+    modGain.gain.exponentialRampToValueAtTime(14, time + 0.16);
+
+    g.gain.setValueAtTime(0.001, time);
+    g.gain.linearRampToValueAtTime(vol * 0.78, time + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+
+    mod.connect(modGain);
+    modGain.connect(carrier.frequency);
+    carrier.connect(g);
+    g.connect(this.sfxBus);
+
+    mod.start(time);
+    carrier.start(time);
+    mod.stop(time + 0.24);
+    carrier.stop(time + 0.24);
+
+    // 2. High-tech shimmering laser tail
+    this.triggerLaserSweep(time + 0.006, baseFreq * 4.2, baseFreq * 3.0, 0.08, vol * 0.28 * brightness, 'sine');
+    this.playPlasmaSizzle(time, 5800 * brightness + 800, vol * 0.22, 0.04);
+  }
+
   /**
-   * Plays a modern, musical mistake/miss cue tailored to the active track's genre and key.
-   * Never uses harsh retro buzzers — uses vinyl tape-stops, muted palm-slaps, or filtered sub-cuts.
+   * Modern sci-fi miss / wrong-tap sound:
+   * Energy shield short-circuit + resonant plasma power-down dive + brief electric static fizzle.
    */
   public playMiss(): void {
     this.ensureInitialized();
     if (!this.ctx || !this.sfxBus) return;
     const now = this.ctx.currentTime;
-    const profile = this.activeTrack.sfxProfile;
     const rootLow = midiToFreq(this.activeTrack.rootMidi - 12);
 
-    if (profile === 'synthwave' || profile === 'disco' || profile === 'lofi') {
-      // Modern vinyl-brake / tape-stop pitch dip (warm filtered)
-      const osc = this.ctx.createOscillator();
-      const filter = this.ctx.createBiquadFilter();
-      const g = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(rootLow * 1.42, now); // subtle tritone tension
-      osc.frequency.exponentialRampToValueAtTime(Math.max(48, rootLow * 0.52), now + 0.16);
-
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(760, now);
-      filter.frequency.exponentialRampToValueAtTime(160, now + 0.16);
-
-      g.gain.setValueAtTime(0.001, now);
-      g.gain.linearRampToValueAtTime(0.28, now + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-
-      osc.connect(filter);
-      filter.connect(g);
-      g.connect(this.sfxBus);
-      osc.start(now);
-      osc.stop(now + 0.19);
-      this.playMutedNoiseTick(now, 900, 0.12, 0.055);
-    } else if (profile === 'funk' || profile === 'swing' || profile === 'latin') {
-      // Tight damped palm-mute / percussive muted bass knock
-      const osc = this.ctx.createOscillator();
-      const filter = this.ctx.createBiquadFilter();
-      const g = this.ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(rootLow * 1.18, now);
-      osc.frequency.exponentialRampToValueAtTime(Math.max(52, rootLow * 0.65), now + 0.09);
-
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(520, now);
-      filter.Q.value = 2.0;
-
-      g.gain.setValueAtTime(0.26, now);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
-
-      osc.connect(filter);
-      filter.connect(g);
-      g.connect(this.sfxBus);
-      osc.start(now);
-      osc.stop(now + 0.12);
-      this.playMutedNoiseTick(now, 1450, 0.15, 0.04);
-    } else {
-      // Modern EDM / Future Bass / Tropical / DnB filtered sub-drop & soft low-pass cut
-      const osc = this.ctx.createOscillator();
-      const g = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(Math.min(185, rootLow * 1.35), now);
-      osc.frequency.exponentialRampToValueAtTime(46, now + 0.15);
-
-      g.gain.setValueAtTime(0.001, now);
-      g.gain.linearRampToValueAtTime(0.32, now + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
-
-      osc.connect(g);
-      g.connect(this.sfxBus);
-      osc.start(now);
-      osc.stop(now + 0.18);
-
-      // Subtle dissonant muted click on top so it's unmistakable on small phone speakers
-      this.triggerFilteredPluck(now, rootLow * 1.89, 'triangle', 0.15, 0.08, 620, 180);
-      this.playMutedNoiseTick(now, 1100, 0.11, 0.045);
-    }
-  }
-
-  private playSfxTransient(time: number, profile: SfxProfileId, gainAmt: number, brightness: number): void {
-    if (!this.ctx || !this.sfxBus || !this.noiseBuffer) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.noiseBuffer;
-
+    // 1. Resonant plasma power-down pitch dive
+    const osc = this.ctx.createOscillator();
+    const mod = this.ctx.createOscillator();
+    const modGain = this.ctx.createGain();
     const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    const centerHz =
-      profile === 'lofi'
-        ? 1800
-        : profile === 'funk' || profile === 'swing' || profile === 'disco'
-          ? 3400
-          : 4400;
-    filter.frequency.setValueAtTime(centerHz * (0.7 + brightness * 0.35), time);
-    filter.Q.value = 1.6;
-
     const g = this.ctx.createGain();
-    g.gain.setValueAtTime(gainAmt, time);
-    g.gain.exponentialRampToValueAtTime(0.001, time + 0.026);
 
-    src.connect(filter);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(Math.min(340, rootLow * 2.1), now);
+    osc.frequency.exponentialRampToValueAtTime(44, now + 0.17);
+
+    // Rapid sci-fi glitch wobble on pitch
+    mod.type = 'square';
+    mod.frequency.setValueAtTime(42, now);
+    modGain.gain.setValueAtTime(28, now);
+    modGain.gain.exponentialRampToValueAtTime(2, now + 0.16);
+
+    filter.type = 'lowpass';
+    filter.Q.value = 3.8;
+    filter.frequency.setValueAtTime(1450, now);
+    filter.frequency.exponentialRampToValueAtTime(140, now + 0.17);
+
+    g.gain.setValueAtTime(0.001, now);
+    g.gain.linearRampToValueAtTime(0.3, now + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+
+    mod.connect(modGain);
+    modGain.connect(osc.frequency);
+    osc.connect(filter);
     filter.connect(g);
     g.connect(this.sfxBus);
-    src.start(time);
-    src.stop(time + 0.032);
+
+    mod.start(now);
+    osc.start(now);
+    mod.stop(now + 0.2);
+    osc.stop(now + 0.2);
+
+    // 2. Short-circuit electric plasma static sputter
+    this.playPlasmaSizzle(now, 1900, 0.2, 0.075);
   }
 
-  private playMutedNoiseTick(time: number, centerHz: number, gainAmt: number, duration: number): void {
+  private triggerLaserSweep(
+    time: number,
+    startHz: number,
+    endHz: number,
+    duration: number,
+    gainAmt: number,
+    type: OscillatorType,
+  ): void {
+    if (!this.ctx || !this.sfxBus) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(Math.max(40, startHz), time);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(40, endHz), time + duration);
+
+    g.gain.setValueAtTime(0.001, time);
+    g.gain.linearRampToValueAtTime(gainAmt, time + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.001, time + duration + 0.04);
+
+    osc.connect(g);
+    g.connect(this.sfxBus);
+    osc.start(time);
+    osc.stop(time + duration + 0.05);
+  }
+
+  private playPlasmaSizzle(time: number, centerHz: number, gainAmt: number, duration: number): void {
     if (!this.ctx || !this.sfxBus || !this.noiseBuffer) return;
     const src = this.ctx.createBufferSource();
     src.buffer = this.noiseBuffer;
@@ -640,7 +658,8 @@ export class RhythmAudioEngine {
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.frequency.setValueAtTime(centerHz, time);
-    filter.Q.value = 1.8;
+    filter.frequency.exponentialRampToValueAtTime(Math.max(600, centerHz * 0.45), time + duration);
+    filter.Q.value = 2.4;
 
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(gainAmt, time);
@@ -653,97 +672,19 @@ export class RhythmAudioEngine {
     src.stop(time + duration + 0.01);
   }
 
-  private triggerFilteredPluck(
-    time: number,
-    freq: number,
-    type: OscillatorType,
-    gainAmt: number,
-    duration: number,
-    startCutoffHz: number,
-    endCutoffHz: number,
-    q = 1.1,
-  ): void {
-    if (!this.ctx || !this.sfxBus) return;
-    const osc = this.ctx.createOscillator();
-    const filter = this.ctx.createBiquadFilter();
-    const g = this.ctx.createGain();
-
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, time);
-
-    filter.type = 'lowpass';
-    filter.Q.value = q;
-    filter.frequency.setValueAtTime(Math.max(120, startCutoffHz), time);
-    filter.frequency.exponentialRampToValueAtTime(Math.max(100, endCutoffHz), time + duration);
-
-    g.gain.setValueAtTime(0.001, time);
-    g.gain.linearRampToValueAtTime(gainAmt, time + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.001, time + duration);
-
-    osc.connect(filter);
-    filter.connect(g);
-    g.connect(this.sfxBus);
-    osc.start(time);
-    osc.stop(time + duration + 0.02);
-  }
-
-  private triggerFmPluck(
-    time: number,
-    carrierHz: number,
-    modHz: number,
-    modDepth: number,
-    gainAmt: number,
-    duration: number,
-  ): void {
-    if (!this.ctx || !this.sfxBus) return;
-    const carrier = this.ctx.createOscillator();
-    const mod = this.ctx.createOscillator();
-    const modGain = this.ctx.createGain();
-    const outGain = this.ctx.createGain();
-
-    carrier.type = 'sine';
-    carrier.frequency.setValueAtTime(carrierHz, time);
-
-    mod.type = 'sine';
-    mod.frequency.setValueAtTime(modHz, time);
-
-    modGain.gain.setValueAtTime(modDepth, time);
-    modGain.gain.exponentialRampToValueAtTime(1, time + duration * 0.65);
-
-    outGain.gain.setValueAtTime(0.001, time);
-    outGain.gain.linearRampToValueAtTime(gainAmt, time + 0.004);
-    outGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
-
-    mod.connect(modGain);
-    modGain.connect(carrier.frequency);
-    carrier.connect(outGain);
-    outGain.connect(this.sfxBus);
-
-    mod.start(time);
-    carrier.start(time);
-    mod.stop(time + duration + 0.02);
-    carrier.stop(time + duration + 0.02);
-  }
-
+  /** Crisp futuristic holographic HUD blip locked to the active track's scale */
   public playUiSelect(pitchMidi = 67): void {
     this.ensureInitialized();
     if (!this.ctx || !this.sfxBus) return;
     const now = this.ctx.currentTime;
     const locked = this.quantizeToActiveScale(pitchMidi);
     const freq = midiToFreq(locked);
-    const profile = this.activeTrack.sfxProfile;
 
-    if (profile === 'synthwave' || profile === 'futurebass' || profile === 'funk') {
-      this.triggerFilteredPluck(now, freq, 'sawtooth', 0.14, 0.16, 3200, 650, 1.8);
-      this.triggerTone(now, freq * 1.5, 'sine', 0.1, 0.14);
-    } else if (profile === 'darkedm' || profile === 'dnb') {
-      this.triggerFmPluck(now, freq * 2, freq * 3, 140, 0.16, 0.14);
-    } else {
-      this.triggerFilteredPluck(now, freq * 2, 'triangle', 0.16, 0.15, 3600, 900);
-      this.triggerTone(now + 0.012, freq * 3, 'sine', 0.08, 0.12);
-    }
+    this.triggerLaserSweep(now, freq * 2.8, freq * 2.0, 0.045, 0.15, 'sine');
+    this.triggerLaserSweep(now + 0.015, freq * 3.0, freq * 4.0, 0.06, 0.08, 'triangle');
   }
 
+  /** Sci-fi rising plasma power-up victory fanfare */
   public playVictoryFanfare(): void {
     this.ensureInitialized();
     if (!this.ctx || !this.sfxBus) return;
@@ -752,11 +693,12 @@ export class RhythmAudioEngine {
     const sc = this.activeTrack.scaleIntervals;
     const notes = [root + sc[0], root + sc[2], root + sc[4], root + 12, root + 12 + sc[2]];
     notes.forEach((m, i) => {
-      this.triggerFilteredPluck(now + i * 0.08, midiToFreq(m), 'triangle', 0.24, 0.5, 4200, 1200);
-      this.triggerTone(now + i * 0.08, midiToFreq(m + 12), 'sine', 0.13, 0.48);
+      const f = midiToFreq(m);
+      this.playSciFiPhoton(now + i * 0.085, f, 0.24, 1.0);
     });
   }
 
+  /** Sci-fi system power-down cadence on Game Over */
   public playGameOverCadence(): void {
     this.ensureInitialized();
     if (!this.ctx || !this.sfxBus) return;
@@ -764,40 +706,9 @@ export class RhythmAudioEngine {
     const root = this.activeTrack.rootMidi - 12;
     const notes = [root + 7, root + 5, root + 3, root];
     notes.forEach((m, i) => {
-      this.triggerFilteredPluck(now + i * 0.13, midiToFreq(m), 'triangle', 0.22, 0.4, 1400, 320);
+      const f = midiToFreq(m);
+      this.triggerLaserSweep(now + i * 0.13, f * 1.4, f * 0.85, 0.14, 0.22, 'sawtooth');
     });
-  }
-
-  private triggerTone(
-    time: number,
-    freq: number,
-    type: OscillatorType,
-    gainAmt: number,
-    duration: number,
-    lowpassHz?: number,
-  ): void {
-    if (!this.ctx || !this.sfxBus) return;
-    const osc = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, time);
-
-    g.gain.setValueAtTime(0.001, time);
-    g.gain.linearRampToValueAtTime(gainAmt, time + 0.006);
-    g.gain.exponentialRampToValueAtTime(0.001, time + duration);
-
-    if (lowpassHz) {
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = lowpassHz;
-      osc.connect(filter);
-      filter.connect(g);
-    } else {
-      osc.connect(g);
-    }
-    g.connect(this.sfxBus);
-    osc.start(time);
-    osc.stop(time + duration + 0.02);
   }
 
   public dispose(): void {
