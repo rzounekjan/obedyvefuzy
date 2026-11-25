@@ -26,7 +26,7 @@ type DockTab = 'levels' | 'music';
 /**
  * Full-viewport solid opaque arcade Title Screen framing the live 3D vector tableware showcase.
  * Zero shadows, zero transparency — features a compact 2-tab dock for choosing both
- * the tableware level (1–10) and the modern PinOut-style synthwave music track & speed (1–10).
+ * the tableware level (1–10) and the original Pop / Synth-Pop track & speed (1–10).
  */
 export const TitleScreen: React.FC<TitleScreenProps> = ({
   selectedLevelId,
@@ -260,7 +260,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               })}
             </div>
           ) : (
-            /* 10-Step Speed & PinOut Modern Music Selector Grid — buttons labeled strictly with numbers 1–10 */
+            /* 10-Step Speed & Pop/Synth-Pop Selector Grid — buttons labeled strictly with numbers 1–10 */
             <div className="flex flex-col gap-1.5">
               <div className="level-scroll grid grid-cols-5 lg:grid-cols-10 gap-1 sm:gap-1.5 overflow-x-auto">
                 {MUSIC_TRACKS.map((track) => {
@@ -271,7 +271,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                       key={track.id}
                       type="button"
                       onClick={() => onSelectTrack(track.id)}
-                      aria-label={`Skladba ${track.index}`}
+                      aria-label={`Skladba ${track.index} (${track.bpm} BPM)`}
                       aria-pressed={isSelected}
                       className={`flex items-center justify-center rounded-lg border-2 px-1 py-2 transition-colors cursor-pointer min-h-[56px] sm:min-h-[68px] focus-visible:outline-2 focus-visible:outline-[#38bdf8] ${
                         isSelected
@@ -291,17 +291,17 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                 })}
               </div>
 
-              {/* Active Speed & PinOut Modern Music Track Bar */}
+              {/* Active Speed & Studio CC Track Bar */}
               <div className="flex items-center justify-between gap-2 rounded-lg border border-[#2d2858] bg-[#1a1736] px-2.5 py-1.5 text-[11px] sm:text-xs text-[#cbd5e1]">
                 <span className="truncate">
-                  <strong className="text-[#ffd166]">Skladba {activeTrack.index}</strong>
+                  <strong className="text-[#ffd166]">#{activeTrack.index}</strong>
                   {' · '}
-                  <strong className="text-[#ffffff]">{activeTrack.title}</strong>
+                  <strong className="text-[#ffffff]">{activeTrack.artist} – {activeTrack.title}</strong>
                   {' · '}
-                  <span className="text-[#94a3b8]">{activeTrack.sourceLabel}</span>
+                  <span className="text-[#94a3b8]">{activeTrack.genre} ({activeTrack.styleLabel})</span>
                 </span>
                 <span className="font-mono-tabular font-bold text-[#38bdf8] shrink-0">
-                  {activeSpeedPct}%
+                  {activeTrack.bpm} BPM · {activeSpeedPct}%
                 </span>
               </div>
             </div>

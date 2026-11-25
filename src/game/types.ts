@@ -33,16 +33,16 @@ export type GamePhase = 'title' | 'playing' | 'paused' | 'victory' | 'gameover';
 export type MusicStyle = 'dubstep' | 'disco' | 'rnb';
 
 export type MusicTrackId =
-  | 'pinout-neonovy-start'
-  | 'pinout-svetelny-tunel'
-  | 'pinout-laserova-brana'
-  | 'pinout-pulzujici-draha'
-  | 'pinout-nocni-horizont'
-  | 'pinout-kristalovy-odraz'
-  | 'pinout-hologramovy-rytmus'
-  | 'pinout-plazmovy-sprint'
-  | 'pinout-kosmicky-skok'
-  | 'pinout-nekonecny-cas';
+  | 'user-90'
+  | 'user-97'
+  | 'user-102'
+  | 'user-112'
+  | 'user-120'
+  | 'user-128'
+  | 'user-139'
+  | 'user-150'
+  | 'user-165'
+  | 'user-176';
 
 export type SciFiSfxMode = 'laser' | 'plasma' | 'photon';
 
